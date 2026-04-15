@@ -94,6 +94,7 @@ export function createOverviewSection(data: OverviewSectionParams): LovelaceSect
   const showLightSummary = config.show_light_summary !== false;
   const showSecuritySummary = config.show_security_summary !== false;
   const showBatterySummary = config.show_battery_summary !== false;
+  const showValvesSummary = config.show_valves_summary === true;
   const showClimateSummary = config.show_climate_summary === true;
 
   // Build summary cards based on config
@@ -130,6 +131,14 @@ export function createOverviewSection(data: OverviewSectionParams): LovelaceSect
       areas_options: config.areas_options || {},
       hide_mobile_app_batteries: config.hide_mobile_app_batteries,
       battery_critical_threshold: config.battery_critical_threshold,
+    });
+  }
+
+  if (showValvesSummary) {
+    summaryCards.push({
+      type: 'custom:simon42-summary-card',
+      summary_type: 'valves',
+      areas_options: config.areas_options || {},
     });
   }
 
