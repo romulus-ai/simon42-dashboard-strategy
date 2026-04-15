@@ -82,6 +82,8 @@
   "climate": {
     "heating": "Heating",
     "cooling": "Cooling",
+    "dehumidifier": "Dehumidification",
+    "humidity": "Humidification",
     "idle": "Idle",
     "off": "Off"
   },

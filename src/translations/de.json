@@ -82,6 +82,8 @@
   "climate": {
     "heating": "Heizen",
     "cooling": "Kühlen",
+    "dehumidifier": "Luftentfeuchtung",
+    "humidity": "Luftbefeuchtung",
     "idle": "Bereitschaft",
     "off": "Aus"
   },

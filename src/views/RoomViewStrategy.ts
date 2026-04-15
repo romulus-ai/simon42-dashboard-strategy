@@ -102,7 +102,13 @@ class Simon42ViewRoomStrategy extends HTMLElement {
       }
       if (domain === 'cover') {
         if (deviceClass === 'curtain') roomEntities.covers_curtain.push(entityId);
-        else if (deviceClass === 'window' || deviceClass === 'door' || deviceClass === 'gate' || deviceClass === 'garage') roomEntities.covers_window.push(entityId);
+        else if (
+          deviceClass === 'window' ||
+          deviceClass === 'door' ||
+          deviceClass === 'gate' ||
+          deviceClass === 'garage'
+        )
+          roomEntities.covers_window.push(entityId);
         else roomEntities.covers.push(entityId);
         continue;
       }
@@ -111,6 +117,10 @@ class Simon42ViewRoomStrategy extends HTMLElement {
         continue;
       }
       if (domain === 'climate') {
+        roomEntities.climate.push(entityId);
+        continue;
+      }
+      if (domain === 'humidifier') {
         roomEntities.climate.push(entityId);
         continue;
       }
@@ -320,8 +330,10 @@ class Simon42ViewRoomStrategy extends HTMLElement {
 
     // Convert to LovelaceBadgeConfig
     const badges: LovelaceBadgeConfig[] = [];
-    if (primaryTemp) badges.push({ type: 'entity', entity: primaryTemp, color: 'red', tap_action: { action: 'more-info' } });
-    if (primaryHumidity) badges.push({ type: 'entity', entity: primaryHumidity, color: 'indigo', tap_action: { action: 'more-info' } });
+    if (primaryTemp)
+      badges.push({ type: 'entity', entity: primaryTemp, color: 'red', tap_action: { action: 'more-info' } });
+    if (primaryHumidity)
+      badges.push({ type: 'entity', entity: primaryHumidity, color: 'indigo', tap_action: { action: 'more-info' } });
     for (const b of filteredCandidates) {
       const showName = resolveShowName(b.entity, !!b.showName, namesVisible, namesHidden);
       badges.push({
@@ -421,7 +433,10 @@ class Simon42ViewRoomStrategy extends HTMLElement {
       if (cameraCards.length > 0) {
         sections.push({
           type: 'grid',
-          cards: [{ type: 'heading', heading: localize('room.cameras'), heading_style: 'title', icon: 'mdi:cctv' }, ...cameraCards],
+          cards: [
+            { type: 'heading', heading: localize('room.cameras'), heading_style: 'title', icon: 'mdi:cctv' },
+            ...cameraCards,
+          ],
         });
       }
     }
@@ -473,15 +488,18 @@ class Simon42ViewRoomStrategy extends HTMLElement {
       state_content: 'last_changed',
     }));
 
-    domainSection(roomEntities.climate, localize('room.climate'), 'mdi:thermostat', (e) => ({
-      type: 'tile',
-      entity: e,
-      name: stripAreaName(e, area, hass),
-      features: [{ type: 'climate-hvac-modes' }],
-      features_position: 'inline',
-      vertical: false,
-      state_content: ['hvac_action', 'current_temperature'],
-    }));
+    domainSection(roomEntities.climate, localize('room.climate'), 'mdi:thermostat', (e) => {
+      const isHumidifier = e.startsWith('humidifier.');
+      return {
+        type: 'tile',
+        entity: e,
+        name: stripAreaName(e, area, hass),
+        features: [{ type: isHumidifier ? 'humidifier-toggle' : 'climate-hvac-modes' }],
+        features_position: 'inline',
+        vertical: false,
+        state_content: isHumidifier ? ['humidity', 'current_humidity'] : ['hvac_action', 'current_temperature'],
+      };
+    });
 
     domainSection(roomEntities.covers, localize('room.covers'), 'mdi:window-shutter', (e) => ({
       type: 'tile',
