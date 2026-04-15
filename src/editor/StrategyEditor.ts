@@ -6,6 +6,7 @@
 // ====================================================================
 
 import { LitElement, html, css, nothing, type TemplateResult, type PropertyValues } from 'lit';
+import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 import yaml from 'js-yaml';
 
 import type { HomeAssistant } from '../types/homeassistant';
@@ -15,7 +16,9 @@ import type {
   CustomCard,
   CustomBadge,
   RoomEntities,
+  SectionKey,
 } from '../types/strategy';
+import { DEFAULT_SECTIONS_ORDER } from '../types/strategy';
 import type { AreaRegistryEntry, EntityRegistryEntry } from '../types/registries';
 import { localize } from '../utils/localize';
 import { isBadgeCandidate, isDefaultShowName, resolveShowName } from '../utils/badge-utils';
@@ -85,6 +88,7 @@ class Simon42DashboardStrategyEditor extends LitElement {
 
   // Drag state (not reactive — no render needed)
   private _draggedElement: HTMLElement | null = null;
+  private _sectionDraggedElement: HTMLElement | null = null;
 
   // -- Lifecycle --------------------------------------------------------
 
@@ -460,6 +464,83 @@ class Simon42DashboardStrategyEditor extends LitElement {
       font-style: italic;
     }
 
+    /* -- Section order list --------------------------------------------- */
+    .section-order-list {
+      border: 1px solid var(--divider-color);
+      border-radius: var(--ha-card-border-radius, 12px);
+      overflow: hidden;
+    }
+    .section-order-item {
+      display: flex;
+      align-items: center;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--divider-color);
+      background: var(--card-background-color);
+      transition: opacity 0.2s;
+    }
+    .section-order-item:last-child {
+      border-bottom: none;
+    }
+    .section-order-item.dragging {
+      opacity: 0.4;
+    }
+    .section-order-item.drag-over {
+      border-top: 2px solid var(--primary-color);
+    }
+    .section-order-item.disabled {
+      opacity: 0.5;
+    }
+    .section-order-item .drag-handle {
+      margin-right: 12px;
+      color: var(--secondary-text-color);
+      cursor: grab;
+      user-select: none;
+      padding: 4px;
+    }
+    .section-order-item .drag-handle:active {
+      cursor: grabbing;
+    }
+    .section-order-item .section-icon {
+      margin-right: 10px;
+      color: var(--secondary-text-color);
+      --mdc-icon-size: 20px;
+    }
+    .section-order-item .section-label {
+      flex: 1;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .section-order-item .section-hidden-tag {
+      font-size: 12px;
+      color: var(--secondary-text-color);
+      font-style: italic;
+      margin-left: 8px;
+    }
+    .section-order-item .section-toggle {
+      margin-left: auto;
+      cursor: pointer;
+    }
+    .section-order-item .section-toggle input {
+      cursor: pointer;
+      width: 16px;
+      height: 16px;
+    }
+    .section-order-sub {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px 8px 56px;
+      border-bottom: 1px solid var(--divider-color);
+      font-size: 13px;
+      color: var(--secondary-text-color);
+    }
+    .section-order-sub input {
+      cursor: pointer;
+    }
+    .section-order-sub label {
+      cursor: pointer;
+    }
+
     /* -- Entity groups ------------------------------------------------- */
     .entity-groups {
       padding-top: 8px;
@@ -784,6 +865,25 @@ class Simon42DashboardStrategyEditor extends LitElement {
       flex-direction: column;
       gap: 8px;
     }
+    .custom-card-target {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+    }
+    .custom-card-target label {
+      color: var(--secondary-text-color);
+      white-space: nowrap;
+    }
+    .custom-card-target select {
+      flex: 1;
+      padding: 4px 8px;
+      border: 1px solid var(--divider-color);
+      border-radius: 4px;
+      background: var(--card-background-color);
+      color: var(--primary-text-color);
+      font-size: 13px;
+    }
     .custom-item-row {
       display: flex;
       gap: 8px;
@@ -906,7 +1006,6 @@ class Simon42DashboardStrategyEditor extends LitElement {
       <div class="card-config">
         ${this._renderOverviewSection()}
         ${this._renderSummariesSection()}
-        ${this._renderInfoCardsSection()}
         ${this._renderFavoritesSection()}
 
         <div class="section-divider">
@@ -925,6 +1024,7 @@ class Simon42DashboardStrategyEditor extends LitElement {
           </div>
         </div>
 
+        ${this._renderSectionOrderPanel()}
         ${this._renderCustomCardsSection()}
         ${this._renderCustomBadgesSection()}
         ${this._renderCustomViewsSection()}
@@ -935,6 +1035,179 @@ class Simon42DashboardStrategyEditor extends LitElement {
   // ====================================================================
   // SECTION RENDERERS
   // ====================================================================
+
+  // -- Section order panel -----------------------------------------------
+
+  private _getSectionsOrder(): SectionKey[] {
+    return this._config.sections_order || [...DEFAULT_SECTIONS_ORDER];
+  }
+
+  private _updateSectionsOrder(newOrder: SectionKey[]): void {
+    const newConfig: Simon42StrategyConfig = {
+      ...this._config,
+      sections_order: newOrder,
+    };
+    this._config = newConfig;
+    this._fireConfigChanged(newConfig);
+  }
+
+  private _isSectionDisabled(key: SectionKey): boolean {
+    switch (key) {
+      case 'custom_cards':
+        return (this._config.custom_cards || []).length === 0;
+      case 'weather':
+        return this._config.show_weather === false;
+      case 'energy':
+        return this._config.show_energy === false;
+      default:
+        return false;
+    }
+  }
+
+  private static _sectionMeta = new Map<SectionKey, { icon: string; labelKey: string }>([
+    ['overview', { icon: 'mdi:home-outline', labelKey: 'sections.overview' }],
+    ['custom_cards', { icon: 'mdi:cards', labelKey: 'sections.custom_cards' }],
+    ['areas', { icon: 'mdi:floor-plan', labelKey: 'sections.areas' }],
+    ['weather', { icon: 'mdi:weather-partly-cloudy', labelKey: 'sections.weather' }],
+    ['energy', { icon: 'mdi:lightning-bolt', labelKey: 'sections.energy' }],
+  ]);
+
+  private _isSectionToggleable(key: SectionKey): boolean {
+    return key === 'weather' || key === 'energy';
+  }
+
+  private _toggleSectionVisibility(key: SectionKey, visible: boolean): void {
+    if (key === 'weather') {
+      this._toggleChanged('show_weather', visible, true);
+    } else if (key === 'energy') {
+      this._toggleChanged('show_energy', visible, true);
+    }
+  }
+
+  private _renderSectionOrderPanel(): TemplateResult {
+    const order = this._getSectionsOrder();
+    const energyLinkDashboard = this._config.energy_link_dashboard !== false;
+    const showEnergy = this._config.show_energy !== false;
+
+    return html`
+      <div class="section">
+        <div class="section-title">${localize('editor.section_order')}</div>
+        <div class="description" style="margin-left: 0; margin-bottom: 12px;">
+          ${localize('editor.section_order_desc')}
+        </div>
+        <div class="section-order-list" id="section-order-list">
+          ${order.map((key) => {
+            const meta = Simon42DashboardStrategyEditor._sectionMeta.get(key);
+            if (!meta) return nothing;
+            const disabled = this._isSectionDisabled(key);
+            const toggleable = this._isSectionToggleable(key);
+            return html`
+              <div class="section-order-item ${disabled ? 'disabled' : ''}"
+                data-section-key=${key}
+                draggable="true"
+                @dragstart=${this._handleSectionDragStart}
+                @dragend=${this._handleSectionDragEnd}
+                @dragover=${this._handleSectionDragOver}
+                @dragleave=${this._handleSectionDragLeave}
+                @drop=${this._handleSectionDrop}>
+                <span class="drag-handle" draggable="true">&#x2630;</span>
+                <ha-icon class="section-icon" icon=${meta.icon}></ha-icon>
+                <span class="section-label">${localize(meta.labelKey)}</span>
+                ${disabled && !toggleable ? html`<span class="section-hidden-tag">(${localize('editor.section_hidden')})</span>` : nothing}
+                ${toggleable ? html`
+                  <label class="section-toggle" @mousedown=${(e: Event) => { e.stopPropagation(); }}>
+                    <input type="checkbox"
+                      ?checked=${!disabled}
+                      @change=${(e: Event) => { this._toggleSectionVisibility(key, (e.target as HTMLInputElement).checked); }}
+                      @dragstart=${(e: Event) => { e.stopPropagation(); }} />
+                  </label>
+                ` : nothing}
+              </div>
+              ${key === 'energy' && showEnergy ? html`
+                <div class="section-order-sub">
+                  <input type="checkbox" id="energy-link-dashboard"
+                    ?checked=${energyLinkDashboard}
+                    @change=${(e: Event) => { this._toggleChanged('energy_link_dashboard', (e.target as HTMLInputElement).checked, true); }} />
+                  <label for="energy-link-dashboard">${localize('editor.energy_link_dashboard')}</label>
+                </div>
+              ` : nothing}
+            `;
+          })}
+        </div>
+      </div>
+    `;
+  }
+
+  // -- Section order drag & drop -----------------------------------------
+
+  private _handleSectionDragStart = (ev: DragEvent): void => {
+    const dragHandle = (ev.target as HTMLElement).closest('.drag-handle');
+    if (!dragHandle) { ev.preventDefault(); return; }
+
+    const item = (ev.target as HTMLElement).closest('.section-order-item') as HTMLElement | null;
+    if (!item) { ev.preventDefault(); return; }
+
+    item.classList.add('dragging');
+    if (ev.dataTransfer) {
+      ev.dataTransfer.effectAllowed = 'move';
+      ev.dataTransfer.setData('text/plain', item.dataset.sectionKey || '');
+    }
+    this._sectionDraggedElement = item;
+  };
+
+  private _handleSectionDragEnd = (ev: DragEvent): void => {
+    const item = (ev.target as HTMLElement).closest('.section-order-item') as HTMLElement | null;
+    if (item) item.classList.remove('dragging');
+
+    const list = this.shadowRoot?.querySelector('#section-order-list');
+    if (list) {
+      list.querySelectorAll('.section-order-item').forEach((el) => {
+        el.classList.remove('drag-over');
+      });
+    }
+    this._sectionDraggedElement = null;
+  };
+
+  private _handleSectionDragOver = (ev: DragEvent): void => {
+    ev.preventDefault();
+    if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move';
+
+    const item = ev.currentTarget as HTMLElement;
+    if (item !== this._sectionDraggedElement) {
+      item.classList.add('drag-over');
+    }
+  };
+
+  private _handleSectionDragLeave = (ev: DragEvent): void => {
+    (ev.currentTarget as HTMLElement).classList.remove('drag-over');
+  };
+
+  private _handleSectionDrop = (ev: DragEvent): void => {
+    ev.stopPropagation();
+    ev.preventDefault();
+
+    const dropTarget = ev.currentTarget as HTMLElement;
+    dropTarget.classList.remove('drag-over');
+
+    if (!this._sectionDraggedElement || this._sectionDraggedElement === dropTarget) return;
+
+    const draggedKey = this._sectionDraggedElement.dataset.sectionKey as SectionKey | undefined;
+    const dropKey = dropTarget.dataset.sectionKey as SectionKey | undefined;
+    if (!draggedKey || !dropKey) return;
+
+    const currentOrder = this._getSectionsOrder();
+    const draggedIndex = currentOrder.indexOf(draggedKey);
+    const dropIndex = currentOrder.indexOf(dropKey);
+    if (draggedIndex === -1 || dropIndex === -1) return;
+
+    const newOrder = [...currentOrder];
+    newOrder.splice(draggedIndex, 1);
+    newOrder.splice(dropIndex, 0, draggedKey);
+
+    this._updateSectionsOrder(newOrder);
+  };
+
+  // -- Overview section --------------------------------------------------
 
   private _renderOverviewSection(): TemplateResult {
     const showClockCard = this._config.show_clock_card !== false;
@@ -972,7 +1245,7 @@ class Simon42DashboardStrategyEditor extends LitElement {
         <div class="description">
           ${hasSearchCardDeps
             ? localize('editor.show_search_card_desc')
-            : html`<span>&#x26A0;&#xFE0F; ${localize('editor.show_search_card_missing')}</span>`}
+            : html`<span>&#x26A0;&#xFE0F; ${unsafeHTML(localize('editor.show_search_card_missing'))}</span>`}
         </div>
       </div>
     `;
@@ -1064,25 +1337,6 @@ class Simon42DashboardStrategyEditor extends LitElement {
           </div>
           <div class="description">${localize('editor.battery_thresholds_desc')}</div>
         </div>
-      </div>
-    `;
-  }
-
-  private _renderInfoCardsSection(): TemplateResult {
-    const showWeather = this._config.show_weather !== false;
-    const showEnergy = this._config.show_energy !== false;
-
-    return html`
-      <div class="section">
-        <div class="section-title">${localize('editor.section_info_cards')}</div>
-
-        ${this._renderCheckbox('show-weather', localize('editor.show_weather'), showWeather,
-          (checked) => this._toggleChanged('show_weather', checked, true))}
-        <div class="description">${localize('editor.show_weather_desc')}</div>
-
-        ${this._renderCheckbox('show-energy', localize('editor.show_energy'), showEnergy,
-          (checked) => this._toggleChanged('show_energy', checked, true))}
-        <div class="description">${localize('editor.show_energy_desc')}</div>
       </div>
     `;
   }
@@ -1285,7 +1539,7 @@ class Simon42DashboardStrategyEditor extends LitElement {
             </div>
           ` : nothing}
         </div>
-        <div class="description">${localize('editor.room_pins_desc')}</div>
+        <div class="description">${unsafeHTML(localize('editor.room_pins_desc'))}</div>
 
         ${this._renderCheckbox('room-pins-show-state', localize('editor.show_state'), roomPinsShowState,
           (checked) => this._toggleChanged('room_pins_show_state', checked, false))}
@@ -1486,6 +1740,17 @@ class Simon42DashboardStrategyEditor extends LitElement {
         <div class="custom-item-fields">
           <input type="text" .value=${card.title || ''} placeholder=${localize('editor.card_title_placeholder')}
             @change=${(e: Event) => this._updateCustomCardField(index, 'title', (e.target as HTMLInputElement).value)} />
+          <div class="custom-card-target">
+            <label>${localize('editor.target_section')}:</label>
+            <select
+              @change=${(e: Event) => this._updateCustomCardField(index, 'target_section', (e.target as HTMLSelectElement).value)}>
+              ${(['custom_cards', 'overview', 'areas', 'weather', 'energy'] as const).map((key) => html`
+                <option value=${key} ?selected=${(card.target_section || 'custom_cards') === key}>
+                  ${localize(Simon42DashboardStrategyEditor._sectionMeta.get(key)!.labelKey)}
+                </option>
+              `)}
+            </select>
+          </div>
           <textarea rows="6" placeholder=${localize('editor.yaml_placeholder')}
             .value=${card.yaml || ''}
             style="width: 100%;"
