@@ -1,9 +1,9 @@
 import path from 'path';
 import zlib from 'zlib';
-import webpack from 'webpack';
 import CompressionPlugin from 'compression-webpack-plugin';
 
-const config: webpack.Configuration = {
+/** @type {import('webpack').Configuration} */
+const config = {
   mode: 'production',
   entry: './src/simon42-dashboard-strategy.ts',
   output: {
@@ -29,11 +29,11 @@ const config: webpack.Configuration = {
   optimization: {
     splitChunks: {
       // Chunk architecture:
-      //   main (entry)  → tiny, registers custom element instantly
-      //   lit           → Lit framework, shared by core + views + editor
-      //   core          → Registry, Utils, OverviewViewStrategy, Cards (home screen)
-      //   views         → LightsView, CoversView, SecurityView, BatteriesView, RoomView
-      //   editor        → StrategyEditor + js-yaml (on-demand only)
+      //   main (entry)  -> tiny, registers custom element instantly
+      //   lit           -> Lit framework, shared by core + views + editor
+      //   core          -> Registry, Utils, OverviewViewStrategy, Cards (home screen)
+      //   views         -> LightsView, CoversView, SecurityView, BatteriesView, RoomView
+      //   editor        -> StrategyEditor + js-yaml (on-demand only)
       cacheGroups: {
         lit: {
           test: /[\\/]node_modules[\\/](?:lit|@lit|lit-html|lit-element)[\\/]/,
@@ -75,7 +75,9 @@ const config: webpack.Configuration = {
     new CompressionPlugin({
       algorithm: 'brotliCompress',
       test: /\.js$/,
-      compressionOptions: { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 11 } } as any,
+      compressionOptions: {
+        [zlib.constants.BROTLI_PARAM_QUALITY]: 11,
+      },
       minRatio: 0.8,
       filename: '[path][base].br',
     }),
