@@ -335,6 +335,7 @@ Entitäten können auf mehreren Ebenen gefiltert werden:
 | `areas_display.hidden` | string[] | `[]` | Ausgeblendete Bereiche |
 | `areas_display.order` | string[] | `[]` | Reihenfolge der Bereiche |
 | `areas_options` | object | `{}` | Entity-Filterung pro Bereich |
+| `areas_options.<area_id>.cleaning_vacuum_entity` | string | — | Vakuum-Entity für Bereichsreinigung (`vacuum.clean_area`, Segment-Mapping in HA erforderlich) |
 | `room_pin_entities` | string[] | `[]` | Raum-Pin Entitäten |
 | `show_summary_views` | boolean | `false` | Summary-Views in Navigation |
 | `show_room_views` | boolean | `false` | Raum-Views in Navigation |
