@@ -50,8 +50,8 @@ Wenn dir die simon42 Dashboard Strategy hilft, unterstütze die Weiterentwicklun
 
 - **Grafischer Konfigurator** — Keine YAML-Kenntnisse erforderlich, Drag & Drop für Bereiche
 - **Automatische Raum-Erkennung** — Nutzt Home Assistant Areas, Devices & Floors
-- **Spezialisierte Views** — Lichter, Rollos, Sicherheit, Batterien, Klima — jeweils mit Status-Gruppierung
-- **Zusammenfassungskarten** — Einzeln ein-/ausschaltbar für Lichter, Rollos, Sicherheit, Batterien und Klima
+- **Spezialisierte Views** — Lichter, Rollos, Sicherheit, Batterien, Ventile, Klima — jeweils mit Status-Gruppierung
+- **Zusammenfassungskarten** — Einzeln ein-/ausschaltbar für Lichter, Rollos, Sicherheit, Batterien, Ventile und Klima
 - **Etagen-Gruppierung** — Bereiche und Lichter optional nach Etagen gliedern
 - **Favoriten** — Beliebige Entitäten als Kacheln auf der Übersicht anpinnen
 - **Alarm-Panel** — Optionale Alarmanlage neben der Uhr
@@ -151,7 +151,6 @@ Mehr zur Filterung findest du im Abschnitt [Entity-Filterung](#entity-filterung)
 ```yaml
 strategy:
   type: custom:simon42-dashboard
-
 ```
 
 6. Speichern (oben rechts)
@@ -163,7 +162,6 @@ Nun muss der Raw-Editor verlassen werden. Dafür gibt es zwei Wege:
   > **Wichtig:** Dabei nichts an den Views verändern — einfach nur den Editor verlassen. Änderungen an Views würden die Strategy-Kontrolle aufheben.
 
 Anschließend öffnet sich über das **Stift-Icon** oben rechts in dem Strategy-Dashboard der grafische Editor 🎉
-
 
 ## Konfiguration
 
@@ -179,7 +177,7 @@ Die Hauptseite des Dashboards zeigt eine Übersicht mit folgenden Bereichen:
 
 **Uhr & Alarm** — Die Uhr wird standardmäßig angezeigt. Optional kann eine Alarmanlage daneben eingeblendet werden.
 
-**Zusammenfassungen** — Kacheln die den Status aller Lichter, Rollos, Sicherheits-Entitäten, Batterien und Klimageräte zusammenfassen. Jede Zusammenfassung kann einzeln ein- oder ausgeschaltet werden. Das Layout ist als 2-Spalten-Grid (Standard) oder 4-Spalten-Reihe konfigurierbar. Für Rollos kann optional eine **Teiloffen-Gruppe** aktiviert werden, die Rollos mit Position zwischen 1-99% separat anzeigt — inkl. Live-Übergängen während des Fahrens.
+**Zusammenfassungen** — Kacheln die den Status aller Lichter, Rollos, Sicherheits-Entitäten, Batterien, Ventile und Klimageräte zusammenfassen. Jede Zusammenfassung kann einzeln ein- oder ausgeschaltet werden. Das Layout ist als 2-Spalten-Grid (Standard) oder 4-Spalten-Reihe konfigurierbar. Für Rollos kann optional eine **Teiloffen-Gruppe** aktiviert werden, die Rollos mit Position zwischen 1-99% separat anzeigt — inkl. Live-Übergängen während des Fahrens.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/TheRealSimon42/simon42-dashboard-strategy/main/assets/Klima-Zusammenfassung.gif" alt="Klima-Zusammenfassung aktivieren" width="800" />
@@ -240,6 +238,7 @@ Die Hauptseite des Dashboards zeigt eine Übersicht mit folgenden Bereichen:
 ### Erweiterte Funktionen
 
 #### Eigene Karten
+
 Beliebige Lovelace-Karten via YAML zur Übersicht hinzufügen. Die Karten erscheinen in einer eigenen Section zwischen den Zusammenfassungen und den Bereichen. Überschrift und Icon der Section sind frei wählbar.
 
 **Tipp:** Erstelle die Karte zuerst in einem normalen Dashboard, kopiere den YAML-Code und füge ihn im Editor ein.
@@ -247,7 +246,7 @@ Beliebige Lovelace-Karten via YAML zur Übersicht hinzufügen. Die Karten ersche
 ```yaml
 # Beispiel: Markdown-Karte
 type: markdown
-content: "Willkommen zuhause!"
+content: 'Willkommen zuhause!'
 ```
 
 <p align="center">
@@ -282,7 +281,7 @@ sections:
   - type: grid
     cards:
       - type: markdown
-        content: "Meine eigene View"
+        content: 'Meine eigene View'
 ```
 
 <p align="center">
@@ -293,68 +292,70 @@ sections:
 
 Entitäten können auf mehreren Ebenen gefiltert werden:
 
-| Methode | Ebene | Beschreibung |
-|---------|-------|-------------|
-| Nicht sichtbar schalten | Global | Entität wird aus allen auto-generierten Strategies ausgeblendet |
-| Label `no-dboard` | Global | Entität wird nur aus simon42-Strategy-Dashboards ausgeblendet |
-| `groups_options.hidden` | Pro Bereich | Entität nur in bestimmtem Bereich ausblenden |
-| Entity Registry | Automatisch | Hidden/Disabled Entities werden ignoriert |
-| Entity Category | Automatisch | Config/Diagnostic Entities werden ignoriert |
+| Methode                 | Ebene       | Beschreibung                                                    |
+| ----------------------- | ----------- | --------------------------------------------------------------- |
+| Nicht sichtbar schalten | Global      | Entität wird aus allen auto-generierten Strategies ausgeblendet |
+| Label `no-dboard`       | Global      | Entität wird nur aus simon42-Strategy-Dashboards ausgeblendet   |
+| `groups_options.hidden` | Pro Bereich | Entität nur in bestimmtem Bereich ausblenden                    |
+| Entity Registry         | Automatisch | Hidden/Disabled Entities werden ignoriert                       |
+| Entity Category         | Automatisch | Config/Diagnostic Entities werden ignoriert                     |
 
 ### Alle Optionen (Referenz)
 
 <details>
 <summary>Vollständige Konfigurationsreferenz aufklappen</summary>
 
-| Option | Typ | Standard | Beschreibung |
-|--------|-----|----------|-------------|
-| `show_clock_card` | boolean | `true` | Uhr auf der Übersicht |
-| `alarm_entity` | string | — | Alarm-Panel Entity neben der Uhr |
-| `show_search_card` | boolean | `false` | Such-Karte (benötigt custom:search-card) |
-| `show_light_summary` | boolean | `true` | Lichter-Zusammenfassung |
-| `show_covers_summary` | boolean | `true` | Rollo-Zusammenfassung |
-| `show_security_summary` | boolean | `true` | Sicherheits-Zusammenfassung |
-| `show_climate_summary` | boolean | `false` | Klima-Zusammenfassung |
-| `show_battery_summary` | boolean | `true` | Batterie-Zusammenfassung |
-| `summaries_columns` | 2 \| 4 | `2` | Spalten-Layout der Zusammenfassungen |
-| `hide_mobile_app_batteries` | boolean | `false` | Mobile-App-Batterien ausblenden |
-| `battery_critical_threshold` | number | `20` | Schwellwert für kritische Batterien (%) |
-| `battery_low_threshold` | number | `50` | Schwellwert für niedrige Batterien (%) |
-| `show_weather` | boolean | `true` | Wetter-Karte |
-| `show_energy` | boolean | `true` | Energie-Dashboard |
-| `favorite_entities` | string[] | `[]` | Favoriten-Entitäten auf der Übersicht |
-| `group_by_floors` | boolean | `false` | Bereiche nach Etagen gliedern |
-| `show_partially_open_covers` | boolean | `false` | Teiloffene Rollos separat anzeigen |
-| `show_alerts_on_areas` | boolean | `false` | Alert-Icons auf Bereichskarten |
-| `show_locks_in_rooms` | boolean | `false` | Schlösser in Raum-Views |
-| `show_automations_in_rooms` | boolean | `false` | Automationen in Raum-Views |
-| `show_scripts_in_rooms` | boolean | `false` | Skripte in Raum-Views |
-| `show_window_contacts_in_rooms` | boolean | `false` | Fensterkontakte als Badges in Raum-Views |
-| `show_door_contacts_in_rooms` | boolean | `false` | Türkontakte als Badges in Raum-Views |
-| `use_default_area_sort` | boolean | `false` | HA-Sortierung für Bereiche verwenden |
-| `areas_display.hidden` | string[] | `[]` | Ausgeblendete Bereiche |
-| `areas_display.order` | string[] | `[]` | Reihenfolge der Bereiche |
-| `areas_options` | object | `{}` | Entity-Filterung pro Bereich |
-| `room_pin_entities` | string[] | `[]` | Raum-Pin Entitäten |
-| `show_summary_views` | boolean | `false` | Summary-Views in Navigation |
-| `show_room_views` | boolean | `false` | Raum-Views in Navigation |
-| `group_lights_by_floors` | boolean | `false` | Lichter nach Etagen gruppieren |
-| `custom_cards` | object[] | `[]` | Eigene Karten via YAML |
-| `custom_cards_heading` | string | `"Eigene Karten"` | Überschrift der Custom Cards Section |
-| `custom_cards_icon` | string | `"mdi:cards"` | Icon der Custom Cards Section |
-| `custom_badges` | object[] | `[]` | Eigene Badges im Header via YAML |
-| `custom_views` | object[] | `[]` | Eigene Views via YAML |
+| Option                          | Typ      | Standard          | Beschreibung                             |
+| ------------------------------- | -------- | ----------------- | ---------------------------------------- |
+| `show_clock_card`               | boolean  | `true`            | Uhr auf der Übersicht                    |
+| `alarm_entity`                  | string   | —                 | Alarm-Panel Entity neben der Uhr         |
+| `show_search_card`              | boolean  | `false`           | Such-Karte (benötigt custom:search-card) |
+| `show_light_summary`            | boolean  | `true`            | Lichter-Zusammenfassung                  |
+| `show_covers_summary`           | boolean  | `true`            | Rollo-Zusammenfassung                    |
+| `show_security_summary`         | boolean  | `true`            | Sicherheits-Zusammenfassung              |
+| `show_valves_summary`           | boolean  | `false`           | Ventil-Zusammenfassung                   |
+| `show_climate_summary`          | boolean  | `false`           | Klima-Zusammenfassung                    |
+| `show_battery_summary`          | boolean  | `true`            | Batterie-Zusammenfassung                 |
+| `summaries_columns`             | 2 \| 4   | `2`               | Spalten-Layout der Zusammenfassungen     |
+| `hide_mobile_app_batteries`     | boolean  | `false`           | Mobile-App-Batterien ausblenden          |
+| `battery_critical_threshold`    | number   | `20`              | Schwellwert für kritische Batterien (%)  |
+| `battery_low_threshold`         | number   | `50`              | Schwellwert für niedrige Batterien (%)   |
+| `show_weather`                  | boolean  | `true`            | Wetter-Karte                             |
+| `show_energy`                   | boolean  | `true`            | Energie-Dashboard                        |
+| `favorite_entities`             | string[] | `[]`              | Favoriten-Entitäten auf der Übersicht    |
+| `group_by_floors`               | boolean  | `false`           | Bereiche nach Etagen gliedern            |
+| `show_partially_open_covers`    | boolean  | `false`           | Teiloffene Rollos separat anzeigen       |
+| `show_valves_on_areas`          | boolean  | `false`           | Ventile auf Bereichskarten               |
+| `show_alerts_on_areas`          | boolean  | `false`           | Alert-Icons auf Bereichskarten           |
+| `show_locks_in_rooms`           | boolean  | `false`           | Schlösser in Raum-Views                  |
+| `show_automations_in_rooms`     | boolean  | `false`           | Automationen in Raum-Views               |
+| `show_scripts_in_rooms`         | boolean  | `false`           | Skripte in Raum-Views                    |
+| `show_window_contacts_in_rooms` | boolean  | `false`           | Fensterkontakte als Badges in Raum-Views |
+| `show_door_contacts_in_rooms`   | boolean  | `false`           | Türkontakte als Badges in Raum-Views     |
+| `use_default_area_sort`         | boolean  | `false`           | HA-Sortierung für Bereiche verwenden     |
+| `areas_display.hidden`          | string[] | `[]`              | Ausgeblendete Bereiche                   |
+| `areas_display.order`           | string[] | `[]`              | Reihenfolge der Bereiche                 |
+| `areas_options`                 | object   | `{}`              | Entity-Filterung pro Bereich             |
+| `room_pin_entities`             | string[] | `[]`              | Raum-Pin Entitäten                       |
+| `show_summary_views`            | boolean  | `false`           | Summary-Views in Navigation              |
+| `show_room_views`               | boolean  | `false`           | Raum-Views in Navigation                 |
+| `group_lights_by_floors`        | boolean  | `false`           | Lichter nach Etagen gruppieren           |
+| `custom_cards`                  | object[] | `[]`              | Eigene Karten via YAML                   |
+| `custom_cards_heading`          | string   | `"Eigene Karten"` | Überschrift der Custom Cards Section     |
+| `custom_cards_icon`             | string   | `"mdi:cards"`     | Icon der Custom Cards Section            |
+| `custom_badges`                 | object[] | `[]`              | Eigene Badges im Header via YAML         |
+| `custom_views`                  | object[] | `[]`              | Eigene Views via YAML                    |
 
 </details>
 
 ## Fehlerbehebung
 
-| Problem | Lösung |
-|---------|---------|
-| Dashboard zeigt alte Version | **Hard-Refresh:** `Cmd+Shift+R` (Mac) / `Ctrl+Shift+R` (Windows) |
-| Änderungen werden nicht übernommen | In einem **Incognito-/Privat-Fenster** testen — wenn das Problem dort nicht auftritt, ist es ein Browser-Cache-Problem |
-| Welche Version ist installiert? | Browser-Konsole öffnen (F12) → Meldung `Simon42 Dashboard Strategy vX.Y.Z loaded` suchen |
-| Strategy-Timeout auf langsamen Verbindungen | Normal bei Slow 4G — HA hat ein festes 5-Sekunden-Limit für Custom Elements. Bei normalen Verbindungen kein Problem |
+| Problem                                     | Lösung                                                                                                                 |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Dashboard zeigt alte Version                | **Hard-Refresh:** `Cmd+Shift+R` (Mac) / `Ctrl+Shift+R` (Windows)                                                       |
+| Änderungen werden nicht übernommen          | In einem **Incognito-/Privat-Fenster** testen — wenn das Problem dort nicht auftritt, ist es ein Browser-Cache-Problem |
+| Welche Version ist installiert?             | Browser-Konsole öffnen (F12) → Meldung `Simon42 Dashboard Strategy vX.Y.Z loaded` suchen                               |
+| Strategy-Timeout auf langsamen Verbindungen | Normal bei Slow 4G — HA hat ein festes 5-Sekunden-Limit für Custom Elements. Bei normalen Verbindungen kein Problem    |
 
 <details>
 <summary>Migration von manueller Installation zu HACS</summary>
@@ -378,8 +379,8 @@ Das passiert, wenn die alte Resource-URL noch registriert ist und die JS-Datei d
 
 Die Strategy erkennt automatisch die Sprache aus deinen Home Assistant Einstellungen (**Einstellungen → Allgemein → Sprache**). Aktuell unterstützt:
 
-| Sprache | Status |
-|---------|--------|
+| Sprache    | Status      |
+| ---------- | ----------- |
 | 🇩🇪 Deutsch | Vollständig |
 | 🇬🇧 English | Vollständig |
 
@@ -396,13 +397,13 @@ Issues und Pull Requests sind willkommen! Bitte teste PRs gründlich in einem lo
 
 **TypeScript** (ES2020, strict) → **Webpack** → Code-Split Chunks:
 
-| Chunk | Größe | Inhalt |
-|-------|-------|--------|
-| main | ~6 KB | Entry Point, Custom Element Registrierung |
-| lit | ~15 KB | Lit Framework (shared) |
-| core | ~51 KB | Registry, Utils, Translations, Overview, Custom Cards |
-| views | ~19 KB | Lichter, Rollos, Sicherheit, Batterien, Klima, Raum-Detail |
-| editor | ~110 KB | Konfigurations-UI (nur bei Bedarf geladen) |
+| Chunk  | Größe   | Inhalt                                                     |
+| ------ | ------- | ---------------------------------------------------------- |
+| main   | ~6 KB   | Entry Point, Custom Element Registrierung                  |
+| lit    | ~15 KB  | Lit Framework (shared)                                     |
+| core   | ~51 KB  | Registry, Utils, Translations, Overview, Custom Cards      |
+| views  | ~19 KB  | Lichter, Rollos, Sicherheit, Batterien, Klima, Raum-Detail |
+| editor | ~110 KB | Konfigurations-UI (nur bei Bedarf geladen)                 |
 
 ### Performance-Design
 
