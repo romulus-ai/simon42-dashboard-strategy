@@ -85,6 +85,7 @@ export interface AreasDisplay {
 }
 
 export interface AreaOptions {
+  cleaning_vacuum_entity?: string;
   groups_options?: Record<string, GroupOptions>;
 }
 

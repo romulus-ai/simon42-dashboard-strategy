@@ -305,6 +305,7 @@ Entitäten können auf mehreren Ebenen gefiltert werden:
 <details>
 <summary>Vollständige Konfigurationsreferenz aufklappen</summary>
 
+<<<<<<< HEAD
 | Option                          | Typ      | Standard          | Beschreibung                             |
 | ------------------------------- | -------- | ----------------- | ---------------------------------------- |
 | `show_clock_card`               | boolean  | `true`            | Uhr auf der Übersicht                    |
@@ -345,6 +346,47 @@ Entitäten können auf mehreren Ebenen gefiltert werden:
 | `custom_cards_icon`             | string   | `"mdi:cards"`     | Icon der Custom Cards Section            |
 | `custom_badges`                 | object[] | `[]`              | Eigene Badges im Header via YAML         |
 | `custom_views`                  | object[] | `[]`              | Eigene Views via YAML                    |
+=======
+| Option | Typ | Standard | Beschreibung |
+|--------|-----|----------|-------------|
+| `show_clock_card` | boolean | `true` | Uhr auf der Übersicht |
+| `alarm_entity` | string | — | Alarm-Panel Entity neben der Uhr |
+| `show_search_card` | boolean | `false` | Such-Karte (benötigt custom:search-card) |
+| `show_light_summary` | boolean | `true` | Lichter-Zusammenfassung |
+| `show_covers_summary` | boolean | `true` | Rollo-Zusammenfassung |
+| `show_security_summary` | boolean | `true` | Sicherheits-Zusammenfassung |
+| `show_climate_summary` | boolean | `false` | Klima-Zusammenfassung |
+| `show_battery_summary` | boolean | `true` | Batterie-Zusammenfassung |
+| `summaries_columns` | 2 \| 4 | `2` | Spalten-Layout der Zusammenfassungen |
+| `hide_mobile_app_batteries` | boolean | `false` | Mobile-App-Batterien ausblenden |
+| `battery_critical_threshold` | number | `20` | Schwellwert für kritische Batterien (%) |
+| `battery_low_threshold` | number | `50` | Schwellwert für niedrige Batterien (%) |
+| `show_weather` | boolean | `true` | Wetter-Karte |
+| `show_energy` | boolean | `true` | Energie-Dashboard |
+| `favorite_entities` | string[] | `[]` | Favoriten-Entitäten auf der Übersicht |
+| `group_by_floors` | boolean | `false` | Bereiche nach Etagen gliedern |
+| `show_partially_open_covers` | boolean | `false` | Teiloffene Rollos separat anzeigen |
+| `show_alerts_on_areas` | boolean | `false` | Alert-Icons auf Bereichskarten |
+| `show_locks_in_rooms` | boolean | `false` | Schlösser in Raum-Views |
+| `show_automations_in_rooms` | boolean | `false` | Automationen in Raum-Views |
+| `show_scripts_in_rooms` | boolean | `false` | Skripte in Raum-Views |
+| `show_window_contacts_in_rooms` | boolean | `false` | Fensterkontakte als Badges in Raum-Views |
+| `show_door_contacts_in_rooms` | boolean | `false` | Türkontakte als Badges in Raum-Views |
+| `use_default_area_sort` | boolean | `false` | HA-Sortierung für Bereiche verwenden |
+| `areas_display.hidden` | string[] | `[]` | Ausgeblendete Bereiche |
+| `areas_display.order` | string[] | `[]` | Reihenfolge der Bereiche |
+| `areas_options` | object | `{}` | Entity-Filterung pro Bereich |
+| `areas_options.<area_id>.cleaning_vacuum_entity` | string | — | Vakuum-Entity für Bereichsreinigung (`vacuum.clean_area`, Segment-Mapping in HA erforderlich) |
+| `room_pin_entities` | string[] | `[]` | Raum-Pin Entitäten |
+| `show_summary_views` | boolean | `false` | Summary-Views in Navigation |
+| `show_room_views` | boolean | `false` | Raum-Views in Navigation |
+| `group_lights_by_floors` | boolean | `false` | Lichter nach Etagen gruppieren |
+| `custom_cards` | object[] | `[]` | Eigene Karten via YAML |
+| `custom_cards_heading` | string | `"Eigene Karten"` | Überschrift der Custom Cards Section |
+| `custom_cards_icon` | string | `"mdi:cards"` | Icon der Custom Cards Section |
+| `custom_badges` | object[] | `[]` | Eigene Badges im Header via YAML |
+| `custom_views` | object[] | `[]` | Eigene Views via YAML |
+>>>>>>> 4cab16d (feat: adds vacuum stuff)
 
 </details>
 

@@ -1247,9 +1247,9 @@ class Simon42DashboardStrategyEditor extends LitElement {
       <div class="section">
         <div class="section-title">${localize('editor.section_overview')}</div>
 
-        ${this._renderCheckbox('show-clock-card', localize('editor.show_clock_card'), showClockCard, (checked) =>
-          { this._toggleChanged('show_clock_card', checked, true); }
-        )}
+        ${this._renderCheckbox('show-clock-card', localize('editor.show_clock_card'), showClockCard, (checked) => {
+          this._toggleChanged('show_clock_card', checked, true);
+        })}
         <div class="description">${localize('editor.show_clock_card_desc')}</div>
 
         <div class="form-row">
@@ -1309,7 +1309,9 @@ class Simon42DashboardStrategyEditor extends LitElement {
             name="summaries-columns"
             value="2"
             ?checked=${summariesColumns === 2}
-            @change=${() => { this._summariesColumnsChanged(2); }}
+            @change=${() => {
+              this._summariesColumnsChanged(2);
+            }}
           />
           <label for="summaries-2-columns">${localize('editor.columns_2')}</label>
         </div>
@@ -1320,7 +1322,9 @@ class Simon42DashboardStrategyEditor extends LitElement {
             name="summaries-columns"
             value="4"
             ?checked=${summariesColumns === 4}
-            @change=${() => { this._summariesColumnsChanged(4); }}
+            @change=${() => {
+              this._summariesColumnsChanged(4);
+            }}
           />
           <label for="summaries-4-columns">${localize('editor.columns_4')}</label>
         </div>
@@ -1330,13 +1334,17 @@ class Simon42DashboardStrategyEditor extends LitElement {
           'show-light-summary',
           localize('editor.show_light_summary'),
           showLightSummary,
-          (checked) => { this._toggleChanged('show_light_summary', checked, true); }
+          (checked) => {
+            this._toggleChanged('show_light_summary', checked, true);
+          }
         )}
         ${this._renderCheckbox(
           'group-lights-by-floors',
           localize('editor.group_lights_by_floors'),
           groupLightsByFloors,
-          (checked) => { this._toggleChanged('group_lights_by_floors', checked, false); }
+          (checked) => {
+            this._toggleChanged('group_lights_by_floors', checked, false);
+          }
         )}
         <div class="description">${localize('editor.group_lights_by_floors_desc')}</div>
 
@@ -1344,7 +1352,9 @@ class Simon42DashboardStrategyEditor extends LitElement {
           'nested-light-groups',
           localize('editor.nested_light_groups'),
           nestedLightGroups,
-          (checked) => { this._toggleChanged('nested_light_groups', checked, false); }
+          (checked) => {
+            this._toggleChanged('nested_light_groups', checked, false);
+          }
         )}
         <div class="description">${localize('editor.nested_light_groups_desc')}</div>
 
@@ -1352,7 +1362,9 @@ class Simon42DashboardStrategyEditor extends LitElement {
           'show-covers-summary',
           localize('editor.show_covers_summary'),
           showCoversSummary,
-          (checked) => { this._toggleChanged('show_covers_summary', checked, true); }
+          (checked) => {
+            this._toggleChanged('show_covers_summary', checked, true);
+          }
         )}
 
         <div style="margin-left: 26px; margin-bottom: 8px;">
@@ -1360,7 +1372,9 @@ class Simon42DashboardStrategyEditor extends LitElement {
             'show-partially-open-covers',
             localize('editor.show_partially_open_covers'),
             showPartiallyOpenCovers,
-            (checked) => { this._toggleChanged('show_partially_open_covers', checked, false); }
+            (checked) => {
+              this._toggleChanged('show_partially_open_covers', checked, false);
+            }
           )}
           <div class="description">${localize('editor.show_partially_open_covers_desc')}</div>
         </div>
@@ -1369,19 +1383,25 @@ class Simon42DashboardStrategyEditor extends LitElement {
           'show-security-summary',
           localize('editor.show_security_summary'),
           showSecuritySummary,
-          (checked) => { this._toggleChanged('show_security_summary', checked, true); }
+          (checked) => {
+            this._toggleChanged('show_security_summary', checked, true);
+          }
         )}
         ${this._renderCheckbox(
           'show-valves-summary',
           localize('editor.show_valves_summary'),
           showValvesSummary,
-          (checked) => { this._toggleChanged('show_valves_summary', checked, false); }
+          (checked) => {
+            this._toggleChanged('show_valves_summary', checked, false);
+          }
         )}
         ${this._renderCheckbox(
           'show-climate-summary',
           localize('editor.show_climate_summary'),
           showClimateSummary,
-          (checked) => { this._toggleChanged('show_climate_summary', checked, false); }
+          (checked) => {
+            this._toggleChanged('show_climate_summary', checked, false);
+          }
         )}
         <div class="description">${localize('editor.show_climate_summary_desc')}</div>
 
@@ -1389,7 +1409,9 @@ class Simon42DashboardStrategyEditor extends LitElement {
           'show-battery-summary',
           localize('editor.show_battery_summary'),
           showBatterySummary,
-          (checked) => { this._toggleChanged('show_battery_summary', checked, true); }
+          (checked) => {
+            this._toggleChanged('show_battery_summary', checked, true);
+          }
         )}
 
         <div style="margin-left: 26px; margin-bottom: 8px;">
@@ -1397,7 +1419,9 @@ class Simon42DashboardStrategyEditor extends LitElement {
             'hide-mobile-app-batteries',
             localize('editor.hide_mobile_app_batteries'),
             hideMobileAppBatteries,
-            (checked) => { this._toggleChanged('hide_mobile_app_batteries', checked, false); }
+            (checked) => {
+              this._toggleChanged('hide_mobile_app_batteries', checked, false);
+            }
           )}
           <div class="description">${localize('editor.hide_mobile_app_batteries_desc')}</div>
 
@@ -1465,18 +1489,27 @@ class Simon42DashboardStrategyEditor extends LitElement {
                         class="entity-list-item"
                         data-entity-id=${entityId}
                         draggable="true"
-                        @dragstart=${(ev: DragEvent) => { this._handleEntityDragStart(ev, 'favorites'); }}
+                        @dragstart=${(ev: DragEvent) => {
+                          this._handleEntityDragStart(ev, 'favorites');
+                        }}
                         @dragend=${this._handleEntityDragEnd}
                         @dragover=${this._handleEntityDragOver}
                         @dragleave=${this._handleEntityDragLeave}
-                        @drop=${(ev: DragEvent) => { this._handleEntityDrop(ev, 'favorites'); }}
+                        @drop=${(ev: DragEvent) => {
+                          this._handleEntityDrop(ev, 'favorites');
+                        }}
                       >
                         <span class="drag-icon">&#x2630;</span>
                         <span class="item-info">
                           <span class="item-name">${name}</span>
                           <span class="item-entity-id">${entityId}</span>
                         </span>
-                        <button class="btn-remove" @click=${() => { this._removeFavoriteEntity(entityId); }}>
+                        <button
+                          class="btn-remove"
+                          @click=${() => {
+                            this._removeFavoriteEntity(entityId);
+                          }}
+                        >
                           &#x2715;
                         </button>
                       </div>
@@ -1530,14 +1563,16 @@ class Simon42DashboardStrategyEditor extends LitElement {
         </div>
         <div class="description">${localize('editor.favorites_desc')}</div>
 
-        ${this._renderCheckbox('favorites-show-state', localize('editor.show_state'), favoritesShowState, (checked) =>
-          { this._toggleChanged('favorites_show_state', checked, false); }
-        )}
+        ${this._renderCheckbox('favorites-show-state', localize('editor.show_state'), favoritesShowState, (checked) => {
+          this._toggleChanged('favorites_show_state', checked, false);
+        })}
         ${this._renderCheckbox(
           'favorites-hide-last-changed',
           localize('editor.hide_last_changed'),
           favoritesHideLastChanged,
-          (checked) => { this._toggleChanged('favorites_hide_last_changed', checked, false); }
+          (checked) => {
+            this._toggleChanged('favorites_hide_last_changed', checked, false);
+          }
         )}
       </div>
     `;
@@ -1561,16 +1596,18 @@ class Simon42DashboardStrategyEditor extends LitElement {
       <div class="section">
         <div class="section-title">${localize('editor.section_areas')}</div>
 
-        ${this._renderCheckbox('group-by-floors', localize('editor.group_by_floors'), groupByFloors, (checked) =>
-          { this._toggleChanged('group_by_floors', checked, false); }
-        )}
+        ${this._renderCheckbox('group-by-floors', localize('editor.group_by_floors'), groupByFloors, (checked) => {
+          this._toggleChanged('group_by_floors', checked, false);
+        })}
         <div class="description">${localize('editor.group_by_floors_desc')}</div>
 
         ${this._renderCheckbox(
           'show-switches-on-areas',
           localize('editor.show_switches_on_areas'),
           showSwitchesOnAreas,
-          (checked) => { this._toggleChanged('show_switches_on_areas', checked, false); }
+          (checked) => {
+            this._toggleChanged('show_switches_on_areas', checked, false);
+          }
         )}
         <div class="description">${localize('editor.show_switches_on_areas_desc')}</div>
 
@@ -1578,7 +1615,9 @@ class Simon42DashboardStrategyEditor extends LitElement {
           'show-valves-on-areas',
           localize('editor.show_valves_on_areas'),
           showValvesOnAreas,
-          (checked) => { this._toggleChanged('show_valves_on_areas', checked, false); }
+          (checked) => {
+            this._toggleChanged('show_valves_on_areas', checked, false);
+          }
         )}
         <div class="description">${localize('editor.show_valves_on_areas_desc')}</div>
 
@@ -1586,7 +1625,10 @@ class Simon42DashboardStrategyEditor extends LitElement {
           'show-alerts-on-areas',
           localize('editor.show_alerts_on_areas'),
           showAlertsOnAreas,
-          (checked) => { this._toggleChanged('show_alerts_on_areas', checked, false); }        )}
+          (checked) => {
+            this._toggleChanged('show_alerts_on_areas', checked, false);
+          }
+        )}
         <div class="description">${localize('editor.show_alerts_on_areas_desc')}</div>
 
         ${this._renderCheckbox(
@@ -2112,6 +2154,15 @@ class Simon42DashboardStrategyEditor extends LitElement {
     } = data;
 
     const hass = this._hass!;
+    const selectedCleaningVacuum = this._config.areas_options?.[areaId]?.cleaning_vacuum_entity || '';
+    const availableVacuums = Object.keys(hass.states)
+      .filter((entityId) => entityId.startsWith('vacuum.'))
+      .map((entityId) => {
+        const stateObj = hass.states[entityId];
+        const name = (stateObj.attributes?.friendly_name as string) || entityId;
+        return { entity_id: entityId, name };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
 
     const domainGroups: DomainGroup[] = [
       { key: 'lights', label: localize('editor.domain_lights'), icon: 'mdi:lightbulb' },
@@ -2138,6 +2189,26 @@ class Simon42DashboardStrategyEditor extends LitElement {
     const expandedGroups = this._expandedGroups.get(areaId) || new Set<string>();
 
     return html`
+      <div class="form-row" style="align-items: center; margin-bottom: 10px;">
+        <label for="cleaning-vacuum-${areaId}" style="min-width: 170px;"
+          >${localize('editor.area_cleaning_vacuum')}</label
+        >
+        <select
+          id="cleaning-vacuum-${areaId}"
+          style="flex: 1;"
+          @change=${(e: Event) => this._areaCleaningVacuumChanged(areaId, (e.target as HTMLSelectElement).value)}
+        >
+          <option value="">${localize('editor.area_cleaning_vacuum_none')}</option>
+          ${availableVacuums.map(
+            (vacuum) => html`
+              <option value=${vacuum.entity_id} ?selected=${selectedCleaningVacuum === vacuum.entity_id}>
+                ${vacuum.name}
+              </option>
+            `
+          )}
+        </select>
+      </div>
+      <div class="description" style="margin-bottom: 10px;">${localize('editor.area_cleaning_vacuum_desc')}</div>
       <div class="entity-groups">
         ${domainGroups.map((group) => {
           const entities = groupedEntities[group.key] as string[] | undefined;
@@ -2451,6 +2522,38 @@ class Simon42DashboardStrategyEditor extends LitElement {
 
     this._config = newConfig;
     this._fireConfigChanged(newConfig);
+  }
+
+  private _areaCleaningVacuumChanged(areaId: string, vacuumEntityId: string): void {
+    const currentAreaOptions = this._config.areas_options?.[areaId] || {};
+    const newAreaOptions: Record<string, any> = { ...currentAreaOptions };
+
+    if (vacuumEntityId) {
+      newAreaOptions.cleaning_vacuum_entity = vacuumEntityId;
+    } else {
+      delete newAreaOptions.cleaning_vacuum_entity;
+    }
+
+    const newAreasOptions: Record<string, any> = {
+      ...(this._config.areas_options || {}),
+    };
+
+    if (Object.keys(newAreaOptions).length === 0) {
+      delete newAreasOptions[areaId];
+    } else {
+      newAreasOptions[areaId] = newAreaOptions;
+    }
+
+    const newConfig: Simon42StrategyConfig = { ...this._config };
+    if (Object.keys(newAreasOptions).length === 0) {
+      delete newConfig.areas_options;
+    } else {
+      newConfig.areas_options = newAreasOptions;
+    }
+
+    this._config = newConfig;
+    this._fireConfigChanged(newConfig);
+    this._refreshAreaCache(areaId);
   }
 
   private _summariesColumnsChanged(columns: 2 | 4): void {
