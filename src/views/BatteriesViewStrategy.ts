@@ -13,17 +13,22 @@ function createBatterySection(
   status: 'critical' | 'low' | 'good',
   rangeText: string,
 ): LovelaceSectionConfig | null {
+
   if (entities.length === 0) return null;
 
-  const emoji = status === 'critical' ? '🔴' : status === 'low' ? '🟡' : '🟢';
-  const color = status === 'critical' ? 'red' : status === 'low' ? 'yellow' : 'green';
+  const style: Record<string, { icon: string; color: string }> = {
+    'critical': { icon: 'mdi:battery-alert', color: 'red' },
+    'low': { icon: 'mdi:battery-20', color: 'yellow' },
+    'good': { icon: 'mdi:battery', color: 'green' },
+  };
 
   return {
     type: 'grid',
     cards: [
       {
         type: 'heading',
-        heading: `${emoji} ${localize('batteries.' + status)} (${rangeText}) - ${entities.length} ${
+        icon: style[status].icon,
+        heading: `${localize('batteries.' + status)} (${rangeText}) - ${entities.length} ${
           localize(entities.length === 1 ? 'batteries.battery_one' : 'batteries.battery_many')
         }`,
         heading_style: 'title',
@@ -33,7 +38,7 @@ function createBatterySection(
         entity: e,
         vertical: false,
         state_content: ['state', 'last_changed'],
-        color,
+        color: style[status].color,
       })),
     ],
   };
