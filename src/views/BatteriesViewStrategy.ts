@@ -10,13 +10,16 @@ import { getBatteryEntities } from '../utils/entity-filter';
 
 function createBatterySection(
   entities: string[],
-  status: 'critical' | 'low' | 'good',
-  rangeText: string,
+  status: 'unknown' | 'critical' | 'low' | 'good',
+  rangeText: string | null,
 ): LovelaceSectionConfig | null {
 
   if (entities.length === 0) return null;
 
+  const oneOrMany = entities.length === 1 ? 'battery_one' : 'battery_many';
+
   const style: Record<string, { icon: string; color: string }> = {
+    'unknown':  { icon: 'mdi:battery-unknown', color: 'white', },
     'critical': { icon: 'mdi:battery-alert', color: 'red' },
     'low': { icon: 'mdi:battery-20', color: 'yellow' },
     'good': { icon: 'mdi:battery', color: 'green' },
@@ -28,9 +31,8 @@ function createBatterySection(
       {
         type: 'heading',
         icon: style[status].icon,
-        heading: `${localize('batteries.' + status)} (${rangeText}) - ${entities.length} ${
-          localize(entities.length === 1 ? 'batteries.battery_one' : 'batteries.battery_many')
-        }`,
+        heading: `${localize('batteries.' + status)} ` + (rangeText ? `(${rangeText})` : '') +
+            ` - ${entities.length} ${localize('batteries.' + oneOrMany)}`,
         heading_style: 'title',
       },
       ...entities.map((e) => ({
@@ -55,12 +57,17 @@ class Simon42ViewBatteriesStrategy extends HTMLElement {
     const strategyConfig = config.config || {};
     const criticalThreshold = strategyConfig.battery_critical_threshold ?? 20;
     const lowThreshold = strategyConfig.battery_low_threshold ?? 50;
+    const unknown: string[] = [];
     const critical: string[] = [];
     const low: string[] = [];
     const good: string[] = [];
 
     for (const entityId of batteryEntities) {
       const state = hass.states[entityId];
+      if (strategyConfig.show_unknown_battery_group && (state.state === 'unavailable' || state.state === 'unknown')) {
+        unknown.push(entityId);
+        continue;
+      }
       if (entityId.startsWith('binary_sensor.')) {
         (state.state === 'on' ? critical : good).push(entityId);
         continue;
@@ -86,11 +93,15 @@ class Simon42ViewBatteriesStrategy extends HTMLElement {
       if (isNaN(valB)) return 1;
       return valA - valB;
     };
+    unknown.sort(sortByLevel);
     critical.sort(sortByLevel);
     low.sort(sortByLevel);
     good.sort(sortByLevel);
 
     const sections: LovelaceSectionConfig[] = [];
+
+    const unknownSection = createBatterySection(unknown, 'unknown', null);
+    if (unknownSection) sections.push(unknownSection);
 
     const criticalSection = createBatterySection(critical, 'critical', `< ${criticalThreshold}%`);
     if (criticalSection) sections.push(criticalSection);

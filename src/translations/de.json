@@ -76,6 +76,7 @@
     "critical": "Kritisch",
     "low": "Niedrig",
     "good": "Gut",
+    "unknown": "Unbekannt",
     "battery_one": "Batterie",
     "battery_many": "Batterien"
   },
@@ -135,6 +136,8 @@
     "show_battery_summary": "Batterie-Zusammenfassung anzeigen",
     "hide_mobile_app_batteries": "Mobile-App-Batterien ausblenden",
     "hide_mobile_app_batteries_desc": "Blendet Batterien von Smartphones, Tablets und Watches (Mobile App) in der Batterie-Übersicht und -Zusammenfassung aus.",
+    "show_unknown_battery_group": "Unbekannte Entitäten separat anzeigen",
+    "show_unknown_battery_group_desc": "Zeigt eine zusätzliche Gruppe für Batterien mit unbekanntem Zustand an.",
     "battery_thresholds": "Batterie-Schwellwerte",
     "battery_critical_below": "Kritisch unter",
     "battery_low_below": "Niedrig unter",
