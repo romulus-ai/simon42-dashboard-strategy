@@ -169,6 +169,7 @@ class Simon42ViewRoomStrategy extends HTMLElement {
       media_player: [],
       vacuum: [],
       fan: [],
+      valves: [],
       switches: [],
       locks: [],
       automations: [],
@@ -216,7 +217,13 @@ class Simon42ViewRoomStrategy extends HTMLElement {
       }
       if (domain === 'cover') {
         if (deviceClass === 'curtain') roomEntities.covers_curtain.push(entityId);
-        else if (deviceClass === 'window' || deviceClass === 'door' || deviceClass === 'gate' || deviceClass === 'garage') roomEntities.covers_window.push(entityId);
+        else if (
+          deviceClass === 'window' ||
+          deviceClass === 'door' ||
+          deviceClass === 'gate' ||
+          deviceClass === 'garage'
+        )
+          roomEntities.covers_window.push(entityId);
         else roomEntities.covers.push(entityId);
         continue;
       }
@@ -238,6 +245,10 @@ class Simon42ViewRoomStrategy extends HTMLElement {
       }
       if (domain === 'fan') {
         roomEntities.fan.push(entityId);
+        continue;
+      }
+      if (domain === 'valve') {
+        roomEntities.valves.push(entityId);
         continue;
       }
       if (domain === 'switch') {
@@ -434,8 +445,10 @@ class Simon42ViewRoomStrategy extends HTMLElement {
 
     // Convert to LovelaceBadgeConfig
     const badges: LovelaceBadgeConfig[] = [];
-    if (primaryTemp) badges.push({ type: 'entity', entity: primaryTemp, color: 'red', tap_action: { action: 'more-info' } });
-    if (primaryHumidity) badges.push({ type: 'entity', entity: primaryHumidity, color: 'indigo', tap_action: { action: 'more-info' } });
+    if (primaryTemp)
+      badges.push({ type: 'entity', entity: primaryTemp, color: 'red', tap_action: { action: 'more-info' } });
+    if (primaryHumidity)
+      badges.push({ type: 'entity', entity: primaryHumidity, color: 'indigo', tap_action: { action: 'more-info' } });
     for (const b of filteredCandidates) {
       const showName = resolveShowName(b.entity, !!b.showName, namesVisible, namesHidden);
       badges.push({
@@ -540,7 +553,10 @@ class Simon42ViewRoomStrategy extends HTMLElement {
       if (cameraCards.length > 0) {
         sections.push({
           type: 'grid',
-          cards: [{ type: 'heading', heading: localize('room.cameras'), heading_style: 'title', icon: 'mdi:cctv' }, ...cameraCards],
+          cards: [
+            { type: 'heading', heading: localize('room.cameras'), heading_style: 'title', icon: 'mdi:cctv' },
+            ...cameraCards,
+          ],
         });
       }
     }
@@ -600,6 +616,16 @@ class Simon42ViewRoomStrategy extends HTMLElement {
       features_position: 'inline',
       vertical: false,
       state_content: ['hvac_action', 'current_temperature'],
+    }));
+
+    domainSection(roomEntities.valves, localize('room.valves'), 'mdi:valve', (e) => ({
+      type: 'tile',
+      entity: e,
+      name: stripAreaName(e, area, hass),
+      features: [{ type: 'valve-open-close' }],
+      vertical: false,
+      features_position: 'inline',
+      state_content: 'last_changed',
     }));
 
     domainSection(roomEntities.covers, localize('room.covers'), 'mdi:window-shutter', (e) => ({

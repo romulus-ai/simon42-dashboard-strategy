@@ -1888,6 +1888,7 @@ class Simon42DashboardStrategyEditor extends LitElement {
       { key: 'scenes', label: localize('editor.domain_scenes'), icon: 'mdi:palette' },
       { key: 'vacuum', label: localize('editor.domain_vacuum'), icon: 'mdi:robot-vacuum' },
       { key: 'fan', label: localize('editor.domain_fan'), icon: 'mdi:fan' },
+      { key: 'valves', label: localize('editor.domain_valves'), icon: 'mdi:valve' },
       { key: 'switches', label: localize('editor.domain_switches'), icon: 'mdi:light-switch' },
       { key: 'locks', label: localize('editor.domain_locks'), icon: 'mdi:lock' },
     ];
@@ -3125,6 +3126,7 @@ async function getAreaGroupedEntities(areaId: string, hass: HomeAssistant): Prom
     media_player: [],
     vacuum: [],
     fan: [],
+    valves: [],
     switches: [],
     locks: [],
     automations: [],
@@ -3177,6 +3179,8 @@ async function getAreaGroupedEntities(areaId: string, hass: HomeAssistant): Prom
       roomEntities.vacuum.push(entity.entity_id);
     } else if (domain === 'fan') {
       roomEntities.fan.push(entity.entity_id);
+    } else if (domain === 'valve') {
+      roomEntities.valves.push(entity.entity_id);
     } else if (domain === 'switch') {
       roomEntities.switches.push(entity.entity_id);
     } else if (domain === 'lock') {
