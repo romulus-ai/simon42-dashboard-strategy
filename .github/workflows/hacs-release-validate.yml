@@ -1,0 +1,14 @@
+name: HACS Release Validation
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  hacs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate for HACS
+        uses: hacs/action@main
+        with:
+          category: plugin
