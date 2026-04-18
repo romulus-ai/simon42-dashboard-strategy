@@ -30,19 +30,17 @@ const CONTROL_DOMAINS = [
 ] as const;
 
 type ControlDomain = (typeof CONTROL_DOMAINS)[number];
-type AreaControl = ControlDomain | { entity_id: string };
 
 /**
  * Pre-computes which area-controls actually have entities in this area.
  * This avoids the area card having to scan all entities at render time.
  * Same approach as HA's areas-overview-view-strategy.
  */
-function getAreaControls(areaId: string, hass: HomeAssistant): AreaControl[] {
+function getAreaControls(areaId: string, hass: HomeAssistant): ControlDomain[] {
   const areaEntities = Registry.getVisibleEntitiesForArea(areaId);
   if (areaEntities.length === 0) return [];
 
   const foundDomainControls = new Set<ControlDomain>();
-  const valveEntityControls: Array<{ entity_id: string }> = [];
 
   for (const entity of areaEntities) {
     const state = hass.states[entity.entity_id];
@@ -53,16 +51,14 @@ function getAreaControls(areaId: string, hass: HomeAssistant): AreaControl[] {
 
     if (domain === 'light') foundDomainControls.add('light');
     else if (domain === 'fan') foundDomainControls.add('fan');
-    else if (domain === 'valve' && Registry.config.show_valves_on_areas) {
-      valveEntityControls.push({ entity_id: entity.entity_id });
-    } else if (domain === 'switch' && Registry.config.show_switches_on_areas) foundDomainControls.add('switch');
+    else if (domain === 'switch' && Registry.config.show_switches_on_areas) foundDomainControls.add('switch');
     else if (domain === 'cover' && deviceClass) {
       const key = `cover-${deviceClass}` as ControlDomain;
       if (CONTROL_DOMAINS.includes(key)) foundDomainControls.add(key);
     }
   }
 
-  return [...foundDomainControls, ...valveEntityControls];
+  return [...foundDomainControls];
 }
 
 // Alert-relevant binary sensor device classes.
