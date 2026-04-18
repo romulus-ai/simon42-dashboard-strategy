@@ -83,6 +83,8 @@ class Simon42DashboardStrategyEditor extends LitElement {
       badgeCandidates: string[];
       additionalBadges: string[];
       availableEntities: Array<{ entity_id: string; name: string }>;
+      additionalSoilMoisture: string[];
+      availableSoilMoistureEntities: Array<{ entity_id: string; name: string }>;
       defaultShowNames: Set<string>;
       namesVisible: string[];
       namesHidden: string[];
@@ -2098,6 +2100,8 @@ class Simon42DashboardStrategyEditor extends LitElement {
       badgeCandidates,
       additionalBadges,
       availableEntities,
+      additionalSoilMoisture,
+      availableSoilMoistureEntities,
       defaultShowNames,
       namesVisible,
       namesHidden,
@@ -2125,14 +2129,19 @@ class Simon42DashboardStrategyEditor extends LitElement {
       { key: 'vacuum', label: localize('editor.domain_vacuum'), icon: 'mdi:robot-vacuum' },
       { key: 'fan', label: localize('editor.domain_fan'), icon: 'mdi:fan' },
       { key: 'valves', label: localize('editor.domain_valves'), icon: 'mdi:valve' },
+      { key: 'soil_moisture', label: localize('editor.domain_soil_moisture'), icon: 'mdi:sprout' },
       { key: 'switches', label: localize('editor.domain_switches'), icon: 'mdi:light-switch' },
       { key: 'locks', label: localize('editor.domain_locks'), icon: 'mdi:lock' },
     ];
 
     const hasEntities = domainGroups.some((g) => (groupedEntities[g.key]?.length ?? 0) > 0);
     const hasBadges = (badgeCandidates?.length ?? 0) > 0 || (additionalBadges?.length ?? 0) > 0;
+    const hasSoilMoistureOptions =
+      (groupedEntities.soil_moisture?.length ?? 0) > 0 ||
+      (additionalSoilMoisture?.length ?? 0) > 0 ||
+      (availableSoilMoistureEntities?.length ?? 0) > 0;
 
-    const showEntityGroups = hasEntities || hasBadges;
+    const showEntityGroups = hasEntities || hasBadges || hasSoilMoistureOptions;
 
     const expandedGroups = this._expandedGroups.get(areaId) || new Set<string>();
 
@@ -2155,11 +2164,18 @@ class Simon42DashboardStrategyEditor extends LitElement {
         : html`
       <div class="entity-groups">
         ${domainGroups.map((group) => {
-          const entities = groupedEntities[group.key] as string[] | undefined;
-          if (!entities || entities.length === 0) return nothing;
+          const entities = (groupedEntities[group.key] || []) as string[];
+          const soilMoistureAdditional =
+            group.key === 'soil_moisture'
+              ? additionalSoilMoisture.filter((entityId) => !entities.includes(entityId))
+              : [];
+          const soilMoistureAvailable = group.key === 'soil_moisture' ? availableSoilMoistureEntities : [];
+          const groupCount = entities.length + soilMoistureAdditional.length;
+
+          if (groupCount === 0 && soilMoistureAvailable.length === 0) return nothing;
 
           const hiddenInGroup = (hiddenEntities[group.key] || []) as string[];
-          const allHidden = entities.every((e) => hiddenInGroup.includes(e));
+          const allHidden = entities.length > 0 && entities.every((e) => hiddenInGroup.includes(e));
           const someHidden = entities.some((e) => hiddenInGroup.includes(e)) && !allHidden;
           const isGroupExpanded = expandedGroups.has(group.key);
 
@@ -2182,7 +2198,7 @@ class Simon42DashboardStrategyEditor extends LitElement {
                 />
                 <ha-icon icon=${group.icon}></ha-icon>
                 <span class="group-name">${group.label}</span>
-                <span class="entity-count">(${entities.length})</span>
+                <span class="entity-count">(${groupCount})</span>
                 <button
                   class="expand-button-small ${isGroupExpanded ? 'expanded' : ''}"
                   @click=${(e: Event) => {
@@ -2219,6 +2235,48 @@ class Simon42DashboardStrategyEditor extends LitElement {
                           </div>
                         `;
                       })}
+                      ${group.key === 'soil_moisture' && soilMoistureAdditional.length > 0
+                        ? html`
+                            <div class="badge-separator">${localize('editor.badges_additional')}</div>
+                            ${soilMoistureAdditional.map((entityId) => {
+                              const stateObj = hass.states[entityId];
+                              const name =
+                                stateObj?.attributes.friendly_name || entityId.split('.')[1].replace(/_/g, ' ');
+
+                              return html`
+                                <div class="entity-item badge-additional-item">
+                                  <span class="entity-name">${name}</span>
+                                  <span class="entity-id">${entityId}</span>
+                                  <button
+                                    class="badge-remove-btn"
+                                    title=${localize('editor.badges_remove')}
+                                    @click=${() => this._soilMoistureAdditionalChanged(areaId, entityId, false)}
+                                  >
+                                    &#x2715;
+                                  </button>
+                                </div>
+                              `;
+                            })}
+                          `
+                        : nothing}
+                      ${group.key === 'soil_moisture' && soilMoistureAvailable.length > 0
+                        ? html`
+                            <div class="badge-add-section">
+                              <select class="soil-moisture-entity-picker" data-area-id=${areaId}>
+                                <option value="">${localize('editor.badges_select_entity')}</option>
+                                ${soilMoistureAvailable.map(
+                                  (e) => html` <option value=${e.entity_id}>${e.name} (${e.entity_id})</option> `
+                                )}
+                              </select>
+                              <button
+                                class="badge-add-button"
+                                @click=${(e: Event) => this._addSoilMoistureFromPicker(e, areaId)}
+                              >
+                                ${localize('editor.badges_add')}
+                              </button>
+                            </div>
+                          `
+                        : nothing}
                     </div>
                   `
                 : nothing}
@@ -2405,6 +2463,13 @@ class Simon42DashboardStrategyEditor extends LitElement {
     const badgeCandidates = getAreaBadgeCandidates(areaId, this._hass);
     const additionalBadges = getAdditionalBadgesForArea(areaId, this._config);
     const availableEntities = getAvailableBadgeEntities(areaId, this._hass, badgeCandidates, additionalBadges);
+    const additionalSoilMoisture = getAdditionalSoilMoistureForArea(areaId, this._config);
+    const availableSoilMoistureEntities = getAvailableSoilMoistureEntities(
+      areaId,
+      this._hass,
+      groupedEntities.soil_moisture || [],
+      additionalSoilMoisture
+    );
     const defaultShowNames = getDefaultShowNameEntities(badgeCandidates, this._hass);
     const { namesVisible, namesHidden } = getBadgeNamesConfig(areaId, this._config);
 
@@ -2415,6 +2480,8 @@ class Simon42DashboardStrategyEditor extends LitElement {
       badgeCandidates,
       additionalBadges,
       availableEntities,
+      additionalSoilMoisture,
+      availableSoilMoistureEntities,
       defaultShowNames,
       namesVisible,
       namesHidden,
@@ -2432,6 +2499,13 @@ class Simon42DashboardStrategyEditor extends LitElement {
     const badgeCandidates = getAreaBadgeCandidates(areaId, this._hass);
     const additionalBadges = getAdditionalBadgesForArea(areaId, this._config);
     const availableEntities = getAvailableBadgeEntities(areaId, this._hass, badgeCandidates, additionalBadges);
+    const additionalSoilMoisture = getAdditionalSoilMoistureForArea(areaId, this._config);
+    const availableSoilMoistureEntities = getAvailableSoilMoistureEntities(
+      areaId,
+      this._hass,
+      groupedEntities.soil_moisture || [],
+      additionalSoilMoisture
+    );
     const defaultShowNames = getDefaultShowNameEntities(badgeCandidates, this._hass);
     const { namesVisible, namesHidden } = getBadgeNamesConfig(areaId, this._config);
 
@@ -2442,6 +2516,8 @@ class Simon42DashboardStrategyEditor extends LitElement {
       badgeCandidates,
       additionalBadges,
       availableEntities,
+      additionalSoilMoisture,
+      availableSoilMoistureEntities,
       defaultShowNames,
       namesVisible,
       namesHidden,
@@ -3175,6 +3251,82 @@ class Simon42DashboardStrategyEditor extends LitElement {
     picker.value = '';
   }
 
+  private _soilMoistureAdditionalChanged(areaId: string, entityId: string, isAdd: boolean): void {
+    if (!this._config) return;
+
+    const currentAreaOptions = this._config.areas_options?.[areaId] || {};
+    const currentGroupsOptions = currentAreaOptions.groups_options || {};
+    const currentGroupOptions = currentGroupsOptions['soil_moisture'] || {};
+
+    let additional = [...(currentGroupOptions.additional || [])];
+
+    if (isAdd) {
+      if (!additional.includes(entityId)) additional.push(entityId);
+    } else {
+      additional = additional.filter((e) => e !== entityId);
+    }
+
+    const newGroupOptions: Record<string, any> = { ...currentGroupOptions };
+    if (additional.length > 0) {
+      newGroupOptions.additional = additional;
+    } else {
+      delete newGroupOptions.additional;
+    }
+
+    const newGroupsOptions: Record<string, any> = {
+      ...currentGroupsOptions,
+      soil_moisture: newGroupOptions,
+    };
+
+    if (Object.keys(newGroupsOptions.soil_moisture).length === 0) {
+      delete newGroupsOptions.soil_moisture;
+    }
+
+    const newAreaOptions: Record<string, any> = {
+      ...currentAreaOptions,
+      groups_options: newGroupsOptions,
+    };
+
+    if (Object.keys(newAreaOptions.groups_options).length === 0) {
+      delete newAreaOptions.groups_options;
+    }
+
+    const newAreasOptions: Record<string, any> = {
+      ...this._config.areas_options,
+      [areaId]: newAreaOptions,
+    };
+
+    if (Object.keys(newAreasOptions[areaId]).length === 0) {
+      delete newAreasOptions[areaId];
+    }
+
+    const newConfig: Simon42StrategyConfig = {
+      ...this._config,
+      areas_options: newAreasOptions,
+    };
+
+    if (newConfig.areas_options && Object.keys(newConfig.areas_options).length === 0) {
+      delete newConfig.areas_options;
+    }
+
+    this._config = newConfig;
+    this._fireConfigChanged(newConfig);
+
+    this._refreshAreaCache(areaId);
+  }
+
+  private _addSoilMoistureFromPicker(e: Event, areaId: string): void {
+    e.stopPropagation();
+    const picker = this.shadowRoot!.querySelector(
+      `.soil-moisture-entity-picker[data-area-id="${areaId}"]`
+    ) as HTMLSelectElement | null;
+    if (!picker || !picker.value) return;
+
+    const entityId = picker.value;
+    this._soilMoistureAdditionalChanged(areaId, entityId, true);
+    picker.value = '';
+  }
+
   // ====================================================================
   // DRAG AND DROP
   // ====================================================================
@@ -3417,6 +3569,7 @@ async function getAreaGroupedEntities(areaId: string, hass: HomeAssistant): Prom
     vacuum: [],
     fan: [],
     valves: [],
+    soil_moisture: [],
     switches: [],
     locks: [],
     automations: [],
@@ -3476,6 +3629,8 @@ async function getAreaGroupedEntities(areaId: string, hass: HomeAssistant): Prom
       roomEntities.fan.push(entity.entity_id);
     } else if (domain === 'valve') {
       roomEntities.valves.push(entity.entity_id);
+    } else if (domain === 'sensor' && deviceClass === 'moisture') {
+      roomEntities.soil_moisture.push(entity.entity_id);
     } else if (domain === 'switch') {
       roomEntities.switches.push(entity.entity_id);
     } else if (domain === 'lock') {
@@ -3529,6 +3684,10 @@ function getAdditionalBadgesForArea(areaId: string, config: Simon42StrategyConfi
   return config.areas_options?.[areaId]?.groups_options?.badges?.additional || [];
 }
 
+function getAdditionalSoilMoistureForArea(areaId: string, config: Simon42StrategyConfig): string[] {
+  return config.areas_options?.[areaId]?.groups_options?.soil_moisture?.additional || [];
+}
+
 function getAvailableBadgeEntities(
   areaId: string,
   hass: HomeAssistant,
@@ -3559,6 +3718,47 @@ function getAvailableBadgeEntities(
     if (excludeSet.has(entity.entity_id)) continue;
 
     const stateObj = hass.states[entity.entity_id];
+    const name = (stateObj.attributes?.friendly_name as string) || entity.entity_id.split('.')[1].replace(/_/g, ' ');
+    available.push({ entity_id: entity.entity_id, name });
+  }
+
+  available.sort((a, b) => a.name.localeCompare(b.name));
+  return available;
+}
+
+function getAvailableSoilMoistureEntities(
+  areaId: string,
+  hass: HomeAssistant,
+  existingEntities: string[],
+  existingAdditional: string[]
+): Array<{ entity_id: string; name: string }> {
+  const devices = Object.values(hass.devices || {});
+  const entities = Object.values(hass.entities || {});
+  const excludeSet = new Set([...existingEntities, ...existingAdditional]);
+
+  const areaDevices = new Set<string>();
+  for (const device of devices) {
+    if (device.area_id === areaId) areaDevices.add(device.id);
+  }
+
+  const available: Array<{ entity_id: string; name: string }> = [];
+
+  for (const entity of entities) {
+    let belongsToArea = false;
+    if (entity.area_id) belongsToArea = entity.area_id === areaId;
+    else if (entity.device_id && areaDevices.has(entity.device_id)) belongsToArea = true;
+    if (!belongsToArea) continue;
+    if (entity.hidden) continue;
+    if (!hass.states[entity.entity_id]) continue;
+
+    const domain = entity.entity_id.split('.')[0];
+    if (domain !== 'sensor') continue;
+    if (excludeSet.has(entity.entity_id)) continue;
+
+    const stateObj = hass.states[entity.entity_id];
+    const deviceClass = stateObj.attributes?.device_class as string | undefined;
+    if (deviceClass !== 'moisture') continue;
+
     const name = (stateObj.attributes?.friendly_name as string) || entity.entity_id.split('.')[1].replace(/_/g, ' ');
     available.push({ entity_id: entity.entity_id, name });
   }

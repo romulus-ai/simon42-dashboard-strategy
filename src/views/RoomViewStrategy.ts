@@ -170,6 +170,7 @@ class Simon42ViewRoomStrategy extends HTMLElement {
       vacuum: [],
       fan: [],
       valves: [],
+      soil_moisture: [],
       switches: [],
       locks: [],
       automations: [],
@@ -249,6 +250,10 @@ class Simon42ViewRoomStrategy extends HTMLElement {
       }
       if (domain === 'valve') {
         roomEntities.valves.push(entityId);
+        continue;
+      }
+      if (domain === 'sensor' && deviceClass === 'moisture') {
+        roomEntities.soil_moisture.push(entityId);
         continue;
       }
       if (domain === 'switch') {
@@ -334,6 +339,14 @@ class Simon42ViewRoomStrategy extends HTMLElement {
           sensorEntities.gas.push(entityId);
           continue;
         }
+      }
+    }
+
+    const soilMoistureAdditional = groupsOptions.soil_moisture?.additional || [];
+    for (const entityId of soilMoistureAdditional) {
+      if (!hass.states[entityId]) continue;
+      if (!roomEntities.soil_moisture.includes(entityId)) {
+        roomEntities.soil_moisture.push(entityId);
       }
     }
 
@@ -626,6 +639,12 @@ class Simon42ViewRoomStrategy extends HTMLElement {
       vertical: false,
       features_position: 'inline',
       state_content: 'last_changed',
+    }));
+
+    domainSection(roomEntities.soil_moisture, localize('room.soil_moisture'), 'mdi:sprout', (e) => ({
+      type: 'sensor',
+      entity: e,
+      name: stripAreaName(e, area, hass),
     }));
 
     domainSection(roomEntities.covers, localize('room.covers'), 'mdi:window-shutter', (e) => ({

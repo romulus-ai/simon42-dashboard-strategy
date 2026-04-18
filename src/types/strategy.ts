@@ -153,6 +153,7 @@ export interface RoomEntities {
   vacuum: string[];
   fan: string[];
   valves: string[];
+  soil_moisture: string[];
   switches: string[];
   locks: string[];
   automations: string[];
