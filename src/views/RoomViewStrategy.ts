@@ -37,7 +37,6 @@ function mediaPlayerSupportsPlayback(state: HassEntity): boolean {
   return (f & (MEDIA_PAUSE | MEDIA_PLAY | MEDIA_STOP)) !== 0;
 }
 
-
 function vacuumSupportsFeature(state: HassEntity, feature: number): boolean {
   const supported = (state.attributes?.supported_features as number) || 0;
   return (supported & feature) !== 0;
@@ -61,14 +60,23 @@ function buildRoomCleaningBadges(
   vacuumState: HassEntity
 ): LovelaceBadgeConfig[] {
   const nextFanSpeed = getNextVacuumFanSpeed(vacuumState);
+  const vacuumStatus = vacuumState.state;
+  const isVacuumActive =
+    vacuumStatus !== 'docked' &&
+    vacuumStatus !== 'idle' &&
+    vacuumStatus !== 'off' &&
+    vacuumStatus !== 'unavailable' &&
+    vacuumStatus !== 'unknown';
+  const badgeColor = isVacuumActive ? 'light-blue' : 'primary';
 
   const badges: LovelaceBadgeConfig[] = [
     {
       type: 'entity',
       entity: vacuumEntityId,
       name: `${localize('room.cleaning')}: ${localize('room.clean_area')}`,
+      title: `${localize('room.cleaning')}: ${localize('room.clean_area')}`,
       icon: 'mdi:robot-vacuum',
-      color: 'primary',
+      color: badgeColor,
       show_name: false,
       show_state: false,
       tap_action: {
@@ -85,7 +93,9 @@ function buildRoomCleaningBadges(
       type: 'entity',
       entity: vacuumEntityId,
       name: localize('room.pause'),
+      title: localize('room.pause'),
       icon: 'mdi:pause',
+      color: badgeColor,
       show_name: false,
       show_state: false,
       tap_action: {
@@ -101,7 +111,9 @@ function buildRoomCleaningBadges(
       type: 'entity',
       entity: vacuumEntityId,
       name: localize('room.stop'),
+      title: localize('room.stop'),
       icon: 'mdi:stop',
+      color: badgeColor,
       show_name: false,
       show_state: false,
       tap_action: {
@@ -117,7 +129,9 @@ function buildRoomCleaningBadges(
       type: 'entity',
       entity: vacuumEntityId,
       name: localize('room.return_to_base'),
+      title: localize('room.return_to_base'),
       icon: 'mdi:home-map-marker',
+      color: badgeColor,
       show_name: false,
       show_state: false,
       tap_action: {
@@ -133,7 +147,9 @@ function buildRoomCleaningBadges(
       type: 'entity',
       entity: vacuumEntityId,
       name: localize('room.fan_speed_next'),
+      title: localize('room.fan_speed_next'),
       icon: 'mdi:fan-plus',
+      color: badgeColor,
       show_name: false,
       show_state: false,
       tap_action: {
@@ -473,7 +489,9 @@ class Simon42ViewRoomStrategy extends HTMLElement {
       });
     }
 
-    const cleaningVacuumEntity = dashboardConfig.areas_options?.[area.area_id]?.cleaning_vacuum_entity as string | undefined;
+    const cleaningVacuumEntity = dashboardConfig.areas_options?.[area.area_id]?.cleaning_vacuum_entity as
+      | string
+      | undefined;
     if (cleaningVacuumEntity && hass.states[cleaningVacuumEntity]) {
       badges.push(...buildRoomCleaningBadges(area.area_id, cleaningVacuumEntity, hass.states[cleaningVacuumEntity]));
     }
