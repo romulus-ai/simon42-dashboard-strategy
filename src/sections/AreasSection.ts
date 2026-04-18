@@ -30,13 +30,14 @@ const CONTROL_DOMAINS = [
 ] as const;
 
 type ControlDomain = (typeof CONTROL_DOMAINS)[number];
+type AreaControl = ControlDomain | { entity_id: string };
 
 /**
  * Pre-computes which area-controls actually have entities in this area.
  * This avoids the area card having to scan all entities at render time.
  * Same approach as HA's areas-overview-view-strategy.
  */
-function getAreaControls(areaId: string, hass: HomeAssistant): ControlDomain[] {
+function getAreaControls(areaId: string, hass: HomeAssistant): AreaControl[] {
   const areaEntities = Registry.getVisibleEntitiesForArea(areaId);
   if (areaEntities.length === 0) return [];
 
