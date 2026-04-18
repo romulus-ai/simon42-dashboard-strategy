@@ -14,12 +14,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
       - name: Install
         run: npm ci
       - name: Build
         run: npm run build
-      - name: Sanity check dist entrypoint
-        run: test -f dist/simon42-dashboard-strategy.js
+      - name: Verify version consistency
+        run: node scripts/verify-release-version.mjs
+      - name: Verify built bundle references
+        run: node scripts/verify-release-bundle.mjs
       - name: Create GitHub pre-release with JS assets
         uses: softprops/action-gh-release@v3
         with:
@@ -28,6 +34,8 @@ jobs:
           generate_release_notes: true
           files: |
             dist/*.js
+            dist/*.js.gz
+            dist/*.js.br
             dist/*.js.LICENSE.txt
       - name: Validate for HACS
         uses: hacs/action@main
