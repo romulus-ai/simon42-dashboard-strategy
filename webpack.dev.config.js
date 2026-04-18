@@ -1,14 +1,15 @@
 import path from 'path';
 import webpack from 'webpack';
 
-const config: webpack.Configuration = {
+/** @type {import('webpack').Configuration} */
+const config = {
   mode: 'development',
   devtool: 'source-map',
   entry: './src/simon42-dashboard-strategy.ts',
   output: {
     clean: true,
     filename: 'simon42-dashboard-strategy.js',
-    path: path.resolve(__dirname, 'dist'),
+    path: path.resolve(import.meta.dirname, 'dist'),
   },
   resolve: {
     extensions: ['.ts', '.js'],
