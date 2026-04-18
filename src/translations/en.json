@@ -100,7 +100,13 @@
     "misc": "Miscellaneous",
     "automations": "Automations",
     "scripts": "Scripts",
-    "room_pins": "Room Pins"
+    "room_pins": "Room Pins",
+    "cleaning": "Cleaning",
+    "clean_area": "Clean area",
+    "pause": "Pause",
+    "stop": "Stop",
+    "return_to_base": "Return to base",
+    "fan_speed_next": "Fan+"
   },
   "editor": {
     "section_order": "Section Order",
@@ -171,6 +177,9 @@
     "use_default_area_sort": "Use Home Assistant sorting",
     "use_default_area_sort_desc": "Uses the area sorting from Home Assistant instead of the order configured here.",
     "areas_manage_desc": "Choose which areas should be shown on the dashboard and in what order. Expand areas to manage individual entities.",
+    "area_cleaning_vacuum": "Cleaning robot",
+    "area_cleaning_vacuum_none": "None",
+    "area_cleaning_vacuum_desc": "Select which vacuum should clean this area. Note: vacuum.clean_area only works when your vacuum segments are mapped to Home Assistant areas.",
     "section_room_pins": "Room Pins",
     "room_pins_desc": "Select entities to be shown first in their assigned rooms. Ideal for entities that are not automatically detected (e.g. weather stations, special sensors). <strong>Only entities with room assignment can be selected.</strong> These pins only appear in their respective room, not on the overview.",
     "section_views": "Views",

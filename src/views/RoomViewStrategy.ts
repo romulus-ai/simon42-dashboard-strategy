@@ -22,6 +22,9 @@ const FAN_SET_SPEED = 1;
 const MEDIA_PAUSE = 1;
 const MEDIA_PLAY = 16384;
 const MEDIA_STOP = 4096;
+const VACUUM_PAUSE = 2;
+const VACUUM_STOP = 4;
+const VACUUM_RETURN_HOME = 8;
 
 /** Check if a fan supports speed control */
 function fanSupportsSpeed(state: HassEntity): boolean {
@@ -32,6 +35,116 @@ function fanSupportsSpeed(state: HassEntity): boolean {
 function mediaPlayerSupportsPlayback(state: HassEntity): boolean {
   const f = (state.attributes?.supported_features as number) || 0;
   return (f & (MEDIA_PAUSE | MEDIA_PLAY | MEDIA_STOP)) !== 0;
+}
+
+function vacuumSupportsFeature(state: HassEntity, feature: number): boolean {
+  const supported = (state.attributes?.supported_features as number) || 0;
+  return (supported & feature) !== 0;
+}
+
+function getNextVacuumFanSpeed(state: HassEntity): string | number | undefined {
+  const fanSpeedList = state.attributes?.fan_speed_list;
+  if (!Array.isArray(fanSpeedList) || fanSpeedList.length === 0) return undefined;
+
+  const current = state.attributes?.fan_speed;
+  const currentIndex = fanSpeedList.findIndex((value) => String(value) === String(current));
+  if (currentIndex === -1) return fanSpeedList[0] as string | number;
+
+  const nextIndex = (currentIndex + 1) % fanSpeedList.length;
+  return fanSpeedList[nextIndex] as string | number;
+}
+
+function buildRoomCleaningBadges(
+  areaId: string,
+  vacuumEntityId: string,
+  vacuumState: HassEntity
+): LovelaceBadgeConfig[] {
+  const nextFanSpeed = getNextVacuumFanSpeed(vacuumState);
+
+  const badges: LovelaceBadgeConfig[] = [
+    {
+      type: 'entity',
+      entity: vacuumEntityId,
+      name: `${localize('room.cleaning')}: ${localize('room.clean_area')}`,
+      icon: 'mdi:robot-vacuum',
+      color: 'primary',
+      show_name: false,
+      show_state: false,
+      tap_action: {
+        action: 'perform-action',
+        perform_action: 'vacuum.clean_area',
+        target: { entity_id: vacuumEntityId },
+        data: { cleaning_area_id: [areaId] },
+      },
+    },
+  ];
+
+  if (vacuumSupportsFeature(vacuumState, VACUUM_PAUSE)) {
+    badges.push({
+      type: 'entity',
+      entity: vacuumEntityId,
+      name: localize('room.pause'),
+      icon: 'mdi:pause',
+      show_name: false,
+      show_state: false,
+      tap_action: {
+        action: 'perform-action',
+        perform_action: 'vacuum.pause',
+        target: { entity_id: vacuumEntityId },
+      },
+    });
+  }
+
+  if (vacuumSupportsFeature(vacuumState, VACUUM_STOP)) {
+    badges.push({
+      type: 'entity',
+      entity: vacuumEntityId,
+      name: localize('room.stop'),
+      icon: 'mdi:stop',
+      show_name: false,
+      show_state: false,
+      tap_action: {
+        action: 'perform-action',
+        perform_action: 'vacuum.stop',
+        target: { entity_id: vacuumEntityId },
+      },
+    });
+  }
+
+  if (vacuumSupportsFeature(vacuumState, VACUUM_RETURN_HOME)) {
+    badges.push({
+      type: 'entity',
+      entity: vacuumEntityId,
+      name: localize('room.return_to_base'),
+      icon: 'mdi:home-map-marker',
+      show_name: false,
+      show_state: false,
+      tap_action: {
+        action: 'perform-action',
+        perform_action: 'vacuum.return_to_base',
+        target: { entity_id: vacuumEntityId },
+      },
+    });
+  }
+
+  if (nextFanSpeed !== undefined) {
+    badges.push({
+      type: 'entity',
+      entity: vacuumEntityId,
+      name: localize('room.fan_speed_next'),
+      icon: 'mdi:fan-plus',
+      show_name: false,
+      show_state: false,
+      tap_action: {
+        action: 'perform-action',
+        perform_action: 'vacuum.set_fan_speed',
+        target: { entity_id: vacuumEntityId },
+        data: { fan_speed: nextFanSpeed },
+      },
+    });
+  }
+
+  return badges;
 }
 
 class Simon42ViewRoomStrategy extends HTMLElement {
@@ -102,7 +215,13 @@ class Simon42ViewRoomStrategy extends HTMLElement {
       }
       if (domain === 'cover') {
         if (deviceClass === 'curtain') roomEntities.covers_curtain.push(entityId);
-        else if (deviceClass === 'window' || deviceClass === 'door' || deviceClass === 'gate' || deviceClass === 'garage') roomEntities.covers_window.push(entityId);
+        else if (
+          deviceClass === 'window' ||
+          deviceClass === 'door' ||
+          deviceClass === 'gate' ||
+          deviceClass === 'garage'
+        )
+          roomEntities.covers_window.push(entityId);
         else roomEntities.covers.push(entityId);
         continue;
       }
@@ -320,8 +439,10 @@ class Simon42ViewRoomStrategy extends HTMLElement {
 
     // Convert to LovelaceBadgeConfig
     const badges: LovelaceBadgeConfig[] = [];
-    if (primaryTemp) badges.push({ type: 'entity', entity: primaryTemp, color: 'red', tap_action: { action: 'more-info' } });
-    if (primaryHumidity) badges.push({ type: 'entity', entity: primaryHumidity, color: 'indigo', tap_action: { action: 'more-info' } });
+    if (primaryTemp)
+      badges.push({ type: 'entity', entity: primaryTemp, color: 'red', tap_action: { action: 'more-info' } });
+    if (primaryHumidity)
+      badges.push({ type: 'entity', entity: primaryHumidity, color: 'indigo', tap_action: { action: 'more-info' } });
     for (const b of filteredCandidates) {
       const showName = resolveShowName(b.entity, !!b.showName, namesVisible, namesHidden);
       badges.push({
@@ -331,6 +452,13 @@ class Simon42ViewRoomStrategy extends HTMLElement {
         tap_action: { action: 'more-info' },
         ...(showName ? { show_name: true } : {}),
       });
+    }
+
+    const cleaningVacuumEntity = dashboardConfig.areas_options?.[area.area_id]?.cleaning_vacuum_entity as
+      | string
+      | undefined;
+    if (cleaningVacuumEntity && hass.states[cleaningVacuumEntity]) {
+      badges.push(...buildRoomCleaningBadges(area.area_id, cleaningVacuumEntity, hass.states[cleaningVacuumEntity]));
     }
 
     // === SECTIONS ===
@@ -421,7 +549,10 @@ class Simon42ViewRoomStrategy extends HTMLElement {
       if (cameraCards.length > 0) {
         sections.push({
           type: 'grid',
-          cards: [{ type: 'heading', heading: localize('room.cameras'), heading_style: 'title', icon: 'mdi:cctv' }, ...cameraCards],
+          cards: [
+            { type: 'heading', heading: localize('room.cameras'), heading_style: 'title', icon: 'mdi:cctv' },
+            ...cameraCards,
+          ],
         });
       }
     }
@@ -637,7 +768,7 @@ class Simon42ViewRoomStrategy extends HTMLElement {
       `Room ${area.area_id}: ${visibleEntities.length} visible entities, ${sections.length} sections, ${badges.length} badges`
     );
     timeEnd(`room-generate-${area.area_id}`);
-    return { type: 'sections', header: { badges_position: 'bottom' }, sections, badges };
+    return { type: 'sections', header: { badges_position: 'bottom', badges_wrap: 'wrap' }, sections, badges };
   }
 }
 
