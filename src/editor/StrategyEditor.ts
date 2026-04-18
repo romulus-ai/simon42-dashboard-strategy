@@ -1868,6 +1868,15 @@ class Simon42DashboardStrategyEditor extends LitElement {
     } = data;
 
     const hass = this._hass!;
+    const selectedCleaningVacuum = this._config.areas_options?.[areaId]?.cleaning_vacuum_entity || '';
+    const availableVacuums = Object.keys(hass.states)
+      .filter((entityId) => entityId.startsWith('vacuum.'))
+      .map((entityId) => {
+        const stateObj = hass.states[entityId];
+        const name = (stateObj.attributes?.friendly_name as string) || entityId;
+        return { entity_id: entityId, name };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
 
     const domainGroups: DomainGroup[] = [
       { key: 'lights', label: localize('editor.domain_lights'), icon: 'mdi:lightbulb' },
@@ -1886,13 +1895,27 @@ class Simon42DashboardStrategyEditor extends LitElement {
     const hasEntities = domainGroups.some((g) => (groupedEntities[g.key]?.length ?? 0) > 0);
     const hasBadges = (badgeCandidates?.length ?? 0) > 0 || (additionalBadges?.length ?? 0) > 0;
 
-    if (!hasEntities && !hasBadges) {
-      return html`<div class="empty-state">${localize('editor.no_entities_in_area')}</div>`;
-    }
+    const showEntityGroups = hasEntities || hasBadges;
 
     const expandedGroups = this._expandedGroups.get(areaId) || new Set<string>();
 
     return html`
+      <div class="form-row" style="align-items: center; margin-bottom: 10px;">
+        <label for="cleaning-vacuum-${areaId}" style="min-width: 170px;">${localize('editor.area_cleaning_vacuum')}</label>
+        <select id="cleaning-vacuum-${areaId}" style="flex: 1;"
+          @change=${(e: Event) => this._areaCleaningVacuumChanged(areaId, (e.target as HTMLSelectElement).value)}>
+          <option value="">${localize('editor.area_cleaning_vacuum_none')}</option>
+          ${availableVacuums.map((vacuum) => html`
+            <option value=${vacuum.entity_id} ?selected=${selectedCleaningVacuum === vacuum.entity_id}>
+              ${vacuum.name}
+            </option>
+          `)}
+        </select>
+      </div>
+      <div class="description" style="margin-bottom: 10px;">${localize('editor.area_cleaning_vacuum_desc')}</div>
+      ${!showEntityGroups
+        ? html`<div class="empty-state">${localize('editor.no_entities_in_area')}</div>`
+        : html`
       <div class="entity-groups">
         ${domainGroups.map((group) => {
           const entities = groupedEntities[group.key] as string[] | undefined;
@@ -1953,6 +1976,7 @@ class Simon42DashboardStrategyEditor extends LitElement {
           ? this._renderBadgeGroup(areaId, badgeCandidates, additionalBadges, availableEntities, hiddenEntities, defaultShowNames, namesVisible, namesHidden, expandedGroups)
           : nothing}
       </div>
+      `}
     `;
   }
 
@@ -2171,6 +2195,39 @@ class Simon42DashboardStrategyEditor extends LitElement {
 
     this._config = newConfig;
     this._fireConfigChanged(newConfig);
+  }
+
+
+  private _areaCleaningVacuumChanged(areaId: string, vacuumEntityId: string): void {
+    const currentAreaOptions = this._config.areas_options?.[areaId] || {};
+    const newAreaOptions: Record<string, any> = { ...currentAreaOptions };
+
+    if (vacuumEntityId) {
+      newAreaOptions.cleaning_vacuum_entity = vacuumEntityId;
+    } else {
+      delete newAreaOptions.cleaning_vacuum_entity;
+    }
+
+    const newAreasOptions: Record<string, any> = {
+      ...(this._config.areas_options || {}),
+    };
+
+    if (Object.keys(newAreaOptions).length === 0) {
+      delete newAreasOptions[areaId];
+    } else {
+      newAreasOptions[areaId] = newAreaOptions;
+    }
+
+    const newConfig: Simon42StrategyConfig = { ...this._config };
+    if (Object.keys(newAreasOptions).length === 0) {
+      delete newConfig.areas_options;
+    } else {
+      newConfig.areas_options = newAreasOptions;
+    }
+
+    this._config = newConfig;
+    this._fireConfigChanged(newConfig);
+    this._refreshAreaCache(areaId);
   }
 
   private _alarmEntityChanged(e: Event): void {
