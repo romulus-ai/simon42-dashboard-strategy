@@ -15,7 +15,7 @@ declare global {
   }
 }
 
-type SummaryType = 'lights' | 'covers' | 'security' | 'batteries' | 'climate';
+type SummaryType = 'lights' | 'covers' | 'security' | 'batteries' | 'valves' | 'climate';
 
 interface SummaryCardConfig {
   summary_type: SummaryType;
@@ -40,6 +40,7 @@ const COLOR_MAP: Record<string, string> = {
   purple: 'var(--purple-color, #9c27b0)',
   yellow: 'var(--yellow-color, #ffc107)',
   red: 'var(--red-color, #f44336)',
+  blue: 'var(--blue-color, #03a9f4)',
   grey: 'var(--disabled-color, #bdbdbd)',
 };
 
@@ -179,6 +180,12 @@ class Simon42SummaryCard extends LitElement {
         break;
       }
 
+      case 'valves':
+        result = Registry.getVisibleEntityIdsForDomain('valve').filter(
+          (id) => hass.states[id] && this._isEntityRelevant(id, hass.states[id])
+        );
+        break;
+
       case 'climate':
         result = Registry.getVisibleEntityIdsForDomain('climate').filter(
           (id) => hass.states[id] && this._isEntityRelevant(id, hass.states[id])
@@ -245,6 +252,13 @@ class Simon42SummaryCard extends LitElement {
         return count;
       }
 
+      case 'valves':
+        for (const id of this._relevantEntityIds) {
+          const s = hass.states[id]?.state;
+          if (s === 'open' || s === 'opening') count++;
+        }
+        return count;
+
       case 'climate':
         for (const id of this._relevantEntityIds) {
           const s = hass.states[id]?.state;
@@ -264,13 +278,17 @@ class Simon42SummaryCard extends LitElement {
     const configs: Record<SummaryType, DisplayConfig> = {
       lights: {
         icon: 'mdi:lamps',
-        name: hasItems ? `${count} ${count === 1 ? localize('summary.lights_on_one') : localize('summary.lights_on_many')}` : localize('summary.lights_off'),
+        name: hasItems
+          ? `${count} ${count === 1 ? localize('summary.lights_on_one') : localize('summary.lights_on_many')}`
+          : localize('summary.lights_off'),
         color: hasItems ? 'orange' : 'grey',
         path: 'lights',
       },
       covers: {
         icon: 'mdi:blinds-horizontal',
-        name: hasItems ? `${count} ${count === 1 ? localize('summary.covers_open_one') : localize('summary.covers_open_many')}` : localize('summary.covers_closed'),
+        name: hasItems
+          ? `${count} ${count === 1 ? localize('summary.covers_open_one') : localize('summary.covers_open_many')}`
+          : localize('summary.covers_closed'),
         color: hasItems ? 'purple' : 'grey',
         path: 'covers',
       },
@@ -282,13 +300,25 @@ class Simon42SummaryCard extends LitElement {
       },
       batteries: {
         icon: hasItems ? 'mdi:battery-alert' : 'mdi:battery-charging',
-        name: hasItems ? `${count} ${count === 1 ? localize('summary.batteries_critical_one') : localize('summary.batteries_critical_many')}` : localize('summary.batteries_ok'),
+        name: hasItems
+          ? `${count} ${count === 1 ? localize('summary.batteries_critical_one') : localize('summary.batteries_critical_many')}`
+          : localize('summary.batteries_ok'),
         color: hasItems ? 'red' : 'grey',
         path: 'batteries',
       },
+      valves: {
+        icon: 'mdi:valve',
+        name: hasItems
+          ? `${count} ${count === 1 ? localize('summary.valves_open_one') : localize('summary.valves_open_many')}`
+          : localize('summary.valves_closed'),
+        color: hasItems ? 'blue' : 'grey',
+        path: 'valves',
+      },
       climate: {
         icon: 'mdi:thermostat',
-        name: hasItems ? `${count} ${count === 1 ? localize('summary.climate_active_one') : localize('summary.climate_active_many')}` : localize('summary.climate_off'),
+        name: hasItems
+          ? `${count} ${count === 1 ? localize('summary.climate_active_one') : localize('summary.climate_active_many')}`
+          : localize('summary.climate_off'),
         color: hasItems ? 'orange' : 'grey',
         path: 'climate',
       },
@@ -318,7 +348,6 @@ class Simon42SummaryCard extends LitElement {
   }
 
   protected render() {
-
     const display = this._getDisplayConfig();
     const colorCss = COLOR_MAP[display.color] || COLOR_MAP.grey;
 

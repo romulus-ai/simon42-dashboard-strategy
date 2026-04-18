@@ -10,13 +10,7 @@
 
 export type SectionKey = 'overview' | 'custom_cards' | 'areas' | 'weather' | 'energy';
 
-export const DEFAULT_SECTIONS_ORDER: SectionKey[] = [
-  'overview',
-  'custom_cards',
-  'areas',
-  'weather',
-  'energy',
-];
+export const DEFAULT_SECTIONS_ORDER: SectionKey[] = ['overview', 'custom_cards', 'areas', 'weather', 'energy'];
 
 // -- Main Strategy Config ---------------------------------------------
 
@@ -36,6 +30,7 @@ export interface Simon42StrategyConfig {
   nested_light_groups?: boolean; // default: false
   show_security_summary?: boolean; // default: true
   show_battery_summary?: boolean; // default: true
+  show_valves_summary?: boolean; // default: false
   show_climate_summary?: boolean; // default: false
   hide_mobile_app_batteries?: boolean; // default: false
   battery_critical_threshold?: number; // default: 20
@@ -156,6 +151,7 @@ export interface RoomEntities {
   media_player: string[];
   vacuum: string[];
   fan: string[];
+  valves: string[];
   switches: string[];
   locks: string[];
   automations: string[];
@@ -195,7 +191,7 @@ export interface PersonData {
 
 // -- Summary Types (used by summary cards) ----------------------------
 
-export type SummaryType = 'lights' | 'covers' | 'security' | 'batteries' | 'climate';
+export type SummaryType = 'lights' | 'covers' | 'security' | 'batteries' | 'valves' | 'climate';
 
 // -- Resolved Area (internal, enriched area for rendering) ------------
 
