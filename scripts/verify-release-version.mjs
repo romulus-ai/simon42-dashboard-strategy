@@ -1,12 +1,10 @@
 import fs from 'node:fs';
-import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const repoRoot = process.cwd();
-const packageJsonPath = path.join(repoRoot, 'package.json');
-const strategyPath = path.join(repoRoot, 'src', 'simon42-dashboard-strategy.ts');
+process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 
-const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-const strategySource = fs.readFileSync(strategyPath, 'utf8');
+const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+const strategySource = fs.readFileSync('src/simon42-dashboard-strategy.ts', 'utf8');
 
 const packageVersion = packageJson.version;
 if (!packageVersion || typeof packageVersion !== 'string') {

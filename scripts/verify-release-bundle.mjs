@@ -1,27 +1,29 @@
 import fs from 'node:fs';
-import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const repoRoot = process.cwd();
-const distDir = path.join(repoRoot, 'dist');
-const entryFile = path.join(distDir, 'simon42-dashboard-strategy.js');
+process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 
-if (!fs.existsSync(distDir)) {
+if (!fs.existsSync('dist')) {
   console.error('dist directory missing (build did not run or failed)');
   process.exit(1);
 }
 
-if (!fs.existsSync(entryFile)) {
+if (!fs.existsSync('dist/simon42-dashboard-strategy.js')) {
   console.error('dist/simon42-dashboard-strategy.js missing');
   process.exit(1);
 }
 
-const files = fs.readdirSync(distDir);
+const files = fs.readdirSync('dist');
 
-const requiredChunks = ['core', 'lit', 'views', 'editor'];
-for (const chunkName of requiredChunks) {
-  const hasChunk = files.some((file) =>
-    new RegExp(`^simon42-dashboard-strategy-${chunkName}\.[a-f0-9]{8}\.js$`).test(file)
-  );
+const requiredChunkPatterns = {
+  core: /^simon42-dashboard-strategy-core\.[a-f0-9]{8}\.js$/,
+  lit: /^simon42-dashboard-strategy-lit\.[a-f0-9]{8}\.js$/,
+  views: /^simon42-dashboard-strategy-views\.[a-f0-9]{8}\.js$/,
+  editor: /^simon42-dashboard-strategy-editor\.[a-f0-9]{8}\.js$/,
+};
+
+for (const [chunkName, pattern] of Object.entries(requiredChunkPatterns)) {
+  const hasChunk = files.some((file) => pattern.test(file));
   if (!hasChunk) {
     console.error(`Missing required chunk file for '${chunkName}' in dist/`);
     process.exit(1);
