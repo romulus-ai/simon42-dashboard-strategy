@@ -2968,29 +2968,25 @@ class Simon42DashboardStrategyEditor extends LitElement {
 
   private _updateCustomViewField(index: number, field: 'title' | 'path' | 'icon', value: string): void {
     const customViews: CustomView[] = [...(this._config.custom_views || [])];
-    const currentView = customViews[index];
-    if (!currentView) return;
+    if (!Number.isInteger(index) || index < 0 || index >= customViews.length) return;
 
     const safeValue = this._sanitizePlainTextInput(value);
-    let updatedView: CustomView = { ...currentView };
+    const updatedViews = customViews.map((view, viewIndex) => {
+      if (viewIndex !== index) return view;
 
-    switch (field) {
-      case 'title':
-        updatedView = { ...updatedView, title: safeValue };
-        break;
-      case 'path':
-        updatedView = { ...updatedView, path: safeValue };
-        break;
-      case 'icon':
-        updatedView = { ...updatedView, icon: safeValue };
-        break;
-      default:
-        return;
-    }
+      switch (field) {
+        case 'title':
+          return { ...view, title: safeValue };
+        case 'path':
+          return { ...view, path: safeValue };
+        case 'icon':
+          return { ...view, icon: safeValue };
+        default:
+          return view;
+      }
+    });
 
-    customViews[index] = updatedView;
-
-    const newConfig: Simon42StrategyConfig = { ...this._config, custom_views: customViews };
+    const newConfig: Simon42StrategyConfig = { ...this._config, custom_views: updatedViews };
     this._config = newConfig;
     this._fireConfigChanged(newConfig);
   }
@@ -3079,8 +3075,7 @@ class Simon42DashboardStrategyEditor extends LitElement {
 
   private _updateCustomCardField(index: number, field: 'title' | 'target_section', value: string): void {
     const customCards: CustomCard[] = [...(this._config.custom_cards || [])];
-    const currentCard = customCards[index];
-    if (!currentCard) return;
+    if (!Number.isInteger(index) || index < 0 || index >= customCards.length) return;
 
     const sanitizedValue = this._sanitizePlainTextInput(value);
     const nextValue =
@@ -3092,21 +3087,20 @@ class Simon42DashboardStrategyEditor extends LitElement {
           : 'custom_cards'
         : sanitizedValue;
 
-    let updatedCard: CustomCard = { ...currentCard };
-    switch (field) {
-      case 'title':
-        updatedCard = { ...updatedCard, title: nextValue };
-        break;
-      case 'target_section':
-        updatedCard = { ...updatedCard, target_section: nextValue as CustomCard['target_section'] };
-        break;
-      default:
-        return;
-    }
+    const updatedCards = customCards.map((card, cardIndex) => {
+      if (cardIndex !== index) return card;
 
-    customCards[index] = updatedCard;
+      switch (field) {
+        case 'title':
+          return { ...card, title: nextValue };
+        case 'target_section':
+          return { ...card, target_section: nextValue as CustomCard['target_section'] };
+        default:
+          return card;
+      }
+    });
 
-    const newConfig: Simon42StrategyConfig = { ...this._config, custom_cards: customCards };
+    const newConfig: Simon42StrategyConfig = { ...this._config, custom_cards: updatedCards };
     this._config = newConfig;
     this._fireConfigChanged(newConfig);
   }
