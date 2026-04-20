@@ -28,8 +28,9 @@ const VACUUM_RETURN_HOME = 8;
 
 function getStateByEntityId(hass: HomeAssistant, entityId: string): HassEntity | undefined {
   if (!/^[a-z0-9_]+\.[a-z0-9_]+$/i.test(entityId)) return undefined;
-  if (!Object.prototype.hasOwnProperty.call(hass.states, entityId)) return undefined;
-  return Reflect.get(hass.states, entityId) as HassEntity | undefined;
+  const state = Reflect.get(hass.states, entityId);
+  if (!state || typeof state !== 'object') return undefined;
+  return state as HassEntity;
 }
 
 /** Check if a fan supports speed control */

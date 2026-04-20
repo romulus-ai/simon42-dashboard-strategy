@@ -15,8 +15,9 @@ function isGenerateConfig(value: unknown): value is GenerateConfig {
 
 function getStateByEntityId(hass: HomeAssistant, entityId: string): HassEntity | undefined {
   if (!/^[a-z0-9_]+\.[a-z0-9_]+$/i.test(entityId)) return undefined;
-  if (!Object.prototype.hasOwnProperty.call(hass.states, entityId)) return undefined;
-  return Reflect.get(hass.states, entityId) as HassEntity | undefined;
+  const state = Reflect.get(hass.states, entityId);
+  if (!state || typeof state !== 'object') return undefined;
+  return state as HassEntity;
 }
 
 function buildSection(
@@ -64,8 +65,7 @@ function buildSection(
 
 class Simon42ViewValvesStrategy extends HTMLElement {
   static async generate(config: unknown, hass: HomeAssistant): Promise<LovelaceViewConfig> {
-    const dashboardConfig =
-      isGenerateConfig(config) && typeof config.config === 'object' && config.config !== null ? config.config : {};
+    const dashboardConfig = isGenerateConfig(config) ? (config.config ?? {}) : {};
     Registry.initialize(hass, dashboardConfig);
 
     const valveIds = Registry.getVisibleEntityIdsForDomain('valve').filter(
