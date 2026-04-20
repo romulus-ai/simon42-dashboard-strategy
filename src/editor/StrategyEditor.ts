@@ -17,6 +17,7 @@ import type {
   CustomBadge,
   RoomEntities,
   SectionKey,
+  AreaOptions,
 } from '../types/strategy';
 import { DEFAULT_SECTIONS_ORDER } from '../types/strategy';
 import type { AreaRegistryEntry, EntityRegistryEntry } from '../types/registries';
@@ -238,11 +239,12 @@ class Simon42DashboardStrategyEditor extends LitElement {
     return /^[a-z0-9_]+\.[a-z0-9_]+$/i.test(cleanValue) ? cleanValue : '';
   }
 
-  private _getAreaOptions(areaId: string): Record<string, any> {
+  private _getAreaOptions(areaId: string): AreaOptions {
     const allAreaOptions = this._config.areas_options;
     if (!allAreaOptions) return {};
     const areaEntry = Object.entries(allAreaOptions).find(([id]) => id === areaId);
-    return (areaEntry?.[1] as Record<string, any>) || {};
+    if (!areaEntry) return {};
+    return areaEntry[1] as AreaOptions;
   }
 
   private _getSectionLabelKey(key: SectionKey): string {
@@ -2690,7 +2692,7 @@ class Simon42DashboardStrategyEditor extends LitElement {
     const availableSoilMoistureEntities = getAvailableSoilMoistureEntities(
       areaId,
       this._hass,
-      groupedEntities.soil_moisture || [],
+      groupedEntities.soil_moisture,
       additionalSoilMoisture
     );
     const defaultShowNames = getDefaultShowNameEntities(badgeCandidates, this._hass);
@@ -2726,7 +2728,7 @@ class Simon42DashboardStrategyEditor extends LitElement {
     const availableSoilMoistureEntities = getAvailableSoilMoistureEntities(
       areaId,
       this._hass,
-      groupedEntities.soil_moisture || [],
+      groupedEntities.soil_moisture,
       additionalSoilMoisture
     );
     const defaultShowNames = getDefaultShowNameEntities(badgeCandidates, this._hass);
@@ -2785,8 +2787,11 @@ class Simon42DashboardStrategyEditor extends LitElement {
   }
 
   private _areaCleaningVacuumChanged(areaId: string, vacuumEntityId: string): void {
-    const currentAreaOptions = this._config.areas_options?.[areaId] || {};
-    const newAreaOptions: Record<string, any> = { ...currentAreaOptions };
+    const safeAreaId = this._sanitizeAreaId(areaId);
+    if (!safeAreaId) return;
+
+    const currentAreaOptions = this._getAreaOptions(safeAreaId);
+    const newAreaOptions: AreaOptions = { ...currentAreaOptions };
 
     if (vacuumEntityId) {
       newAreaOptions.cleaning_vacuum_entity = vacuumEntityId;
@@ -2794,15 +2799,11 @@ class Simon42DashboardStrategyEditor extends LitElement {
       delete newAreaOptions.cleaning_vacuum_entity;
     }
 
-    const newAreasOptions: Record<string, any> = {
-      ...(this._config.areas_options || {}),
-    };
-
-    if (Object.keys(newAreaOptions).length === 0) {
-      delete newAreasOptions[areaId];
-    } else {
-      newAreasOptions[areaId] = newAreaOptions;
+    const remainingEntries = Object.entries(this._config.areas_options || {}).filter(([id]) => id !== safeAreaId);
+    if (Object.keys(newAreaOptions).length > 0) {
+      remainingEntries.push([safeAreaId, newAreaOptions]);
     }
+    const newAreasOptions = Object.fromEntries(remainingEntries) as Record<string, AreaOptions>;
 
     const newConfig: Simon42StrategyConfig = { ...this._config };
     if (Object.keys(newAreasOptions).length === 0) {
@@ -2813,7 +2814,7 @@ class Simon42DashboardStrategyEditor extends LitElement {
 
     this._config = newConfig;
     this._fireConfigChanged(newConfig);
-    this._refreshAreaCache(areaId);
+    this._refreshAreaCache(safeAreaId);
   }
 
   private _alarmEntityChanged(e: Event): void {
@@ -2967,9 +2968,27 @@ class Simon42DashboardStrategyEditor extends LitElement {
 
   private _updateCustomViewField(index: number, field: 'title' | 'path' | 'icon', value: string): void {
     const customViews: CustomView[] = [...(this._config.custom_views || [])];
-    if (!customViews[index]) return;
+    const currentView = customViews[index];
+    if (!currentView) return;
 
-    customViews[index] = { ...customViews[index], [field]: this._sanitizePlainTextInput(value) };
+    const safeValue = this._sanitizePlainTextInput(value);
+    let updatedView: CustomView = { ...currentView };
+
+    switch (field) {
+      case 'title':
+        updatedView = { ...updatedView, title: safeValue };
+        break;
+      case 'path':
+        updatedView = { ...updatedView, path: safeValue };
+        break;
+      case 'icon':
+        updatedView = { ...updatedView, icon: safeValue };
+        break;
+      default:
+        return;
+    }
+
+    customViews[index] = updatedView;
 
     const newConfig: Simon42StrategyConfig = { ...this._config, custom_views: customViews };
     this._config = newConfig;
@@ -3060,7 +3079,8 @@ class Simon42DashboardStrategyEditor extends LitElement {
 
   private _updateCustomCardField(index: number, field: 'title' | 'target_section', value: string): void {
     const customCards: CustomCard[] = [...(this._config.custom_cards || [])];
-    if (!customCards[index]) return;
+    const currentCard = customCards[index];
+    if (!currentCard) return;
 
     const sanitizedValue = this._sanitizePlainTextInput(value);
     const nextValue =
@@ -3072,7 +3092,19 @@ class Simon42DashboardStrategyEditor extends LitElement {
           : 'custom_cards'
         : sanitizedValue;
 
-    customCards[index] = { ...customCards[index], [field]: nextValue };
+    let updatedCard: CustomCard = { ...currentCard };
+    switch (field) {
+      case 'title':
+        updatedCard = { ...updatedCard, title: nextValue };
+        break;
+      case 'target_section':
+        updatedCard = { ...updatedCard, target_section: nextValue as CustomCard['target_section'] };
+        break;
+      default:
+        return;
+    }
+
+    customCards[index] = updatedCard;
 
     const newConfig: Simon42StrategyConfig = { ...this._config, custom_cards: customCards };
     this._config = newConfig;
