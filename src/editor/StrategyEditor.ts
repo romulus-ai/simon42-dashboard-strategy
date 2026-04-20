@@ -240,6 +240,14 @@ class Simon42DashboardStrategyEditor extends LitElement {
     return target instanceof HTMLInputElement && target.checked === true;
   }
 
+  private _getAreaOptions(areaId: string): AreaOptions {
+    const allAreaOptions = this._config.areas_options;
+    if (!allAreaOptions) return {};
+    const areaEntry = Object.entries(allAreaOptions).find(([id]) => id === areaId);
+    if (!areaEntry) return {};
+    return areaEntry[1] as AreaOptions;
+  }
+
   private _getSectionLabelKey(key: SectionKey): string {
     const meta = Simon42DashboardStrategyEditor._sectionMeta.get(key);
     return meta ? meta.labelKey : 'sections.overview';
@@ -2353,8 +2361,6 @@ class Simon42DashboardStrategyEditor extends LitElement {
               ${domainGroups.map((group) => {
                 const safeAreaId = this._sanitizeAreaId(areaId);
                 const safeGroupKey = this._sanitizeGroupKey(group.key);
-                if (!safeAreaId || !safeGroupKey) return nothing;
-
                 const entities = groupedEntities[group.key] as string[];
                 const soilMoistureAdditional =
                   group.key === 'soil_moisture'
@@ -2788,7 +2794,7 @@ class Simon42DashboardStrategyEditor extends LitElement {
     const safeAreaId = this._sanitizeAreaId(areaId);
     if (!safeAreaId) return;
 
-    const currentAreaOptions = (this._config.areas_options?.[safeAreaId] as AreaOptions | undefined) || {};
+    const currentAreaOptions = this._getAreaOptions(safeAreaId);
     const newAreaOptions: AreaOptions = { ...currentAreaOptions };
 
     if (vacuumEntityId) {
@@ -2964,13 +2970,27 @@ class Simon42DashboardStrategyEditor extends LitElement {
     this._fireConfigChanged(newConfig);
   }
 
-  private _updateCustomViewField(index: number, field: string, value: string): void {
+  private _updateCustomViewField(index: number, field: 'title' | 'path' | 'icon', value: string): void {
     const customViews: CustomView[] = [...(this._config.custom_views || [])];
-    if (!customViews[index]) return;
+    if (!Number.isInteger(index) || index < 0 || index >= customViews.length) return;
 
-    customViews[index] = { ...customViews[index], [field]: value };
+    const safeValue = this._sanitizePlainTextInput(value);
+    const updatedViews = customViews.map((view, viewIndex) => {
+      if (viewIndex !== index) return view;
 
-    const newConfig: Simon42StrategyConfig = { ...this._config, custom_views: customViews };
+      switch (field) {
+        case 'title':
+          return { ...view, title: safeValue };
+        case 'path':
+          return { ...view, path: safeValue };
+        case 'icon':
+          return { ...view, icon: safeValue };
+        default:
+          return view;
+      }
+    });
+
+    const newConfig: Simon42StrategyConfig = { ...this._config, custom_views: updatedViews };
     this._config = newConfig;
     this._fireConfigChanged(newConfig);
   }
@@ -3057,13 +3077,34 @@ class Simon42DashboardStrategyEditor extends LitElement {
     this._fireConfigChanged(newConfig);
   }
 
-  private _updateCustomCardField(index: number, field: string, value: string): void {
+  private _updateCustomCardField(index: number, field: 'title' | 'target_section', value: string): void {
     const customCards: CustomCard[] = [...(this._config.custom_cards || [])];
-    if (!customCards[index]) return;
+    if (!Number.isInteger(index) || index < 0 || index >= customCards.length) return;
 
-    customCards[index] = { ...customCards[index], [field]: value };
+    const sanitizedValue = this._sanitizePlainTextInput(value);
+    const nextValue =
+      field === 'target_section'
+        ? (['custom_cards', 'overview', 'areas', 'weather', 'energy'] as const).includes(
+            sanitizedValue as 'custom_cards' | 'overview' | 'areas' | 'weather' | 'energy'
+          )
+          ? sanitizedValue
+          : 'custom_cards'
+        : sanitizedValue;
 
-    const newConfig: Simon42StrategyConfig = { ...this._config, custom_cards: customCards };
+    const updatedCards = customCards.map((card, cardIndex) => {
+      if (cardIndex !== index) return card;
+
+      switch (field) {
+        case 'title':
+          return { ...card, title: nextValue };
+        case 'target_section':
+          return { ...card, target_section: nextValue as CustomCard['target_section'] };
+        default:
+          return card;
+      }
+    });
+
+    const newConfig: Simon42StrategyConfig = { ...this._config, custom_cards: updatedCards };
     this._config = newConfig;
     this._fireConfigChanged(newConfig);
   }
