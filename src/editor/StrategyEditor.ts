@@ -17,6 +17,7 @@ import type {
   CustomBadge,
   RoomEntities,
   SectionKey,
+  AreaOptions,
 } from '../types/strategy';
 import { DEFAULT_SECTIONS_ORDER } from '../types/strategy';
 import type { AreaRegistryEntry, EntityRegistryEntry } from '../types/registries';
@@ -190,6 +191,21 @@ class Simon42DashboardStrategyEditor extends LitElement {
       return aName.localeCompare(bName);
     });
     return filtered.slice(0, 21);
+  }
+
+  private _sanitizePlainTextInput(value: string): string {
+    return value.replace(/[<>]/g, '');
+  }
+
+  private _sanitizeAreaId(value: string): string {
+    const cleanValue = this._sanitizePlainTextInput(value).trim();
+    return /^[a-z0-9_-]+$/i.test(cleanValue) ? cleanValue : '';
+  }
+
+  private _readSelectValue(e: Event): string {
+    const target = e.target;
+    if (!(target instanceof HTMLSelectElement)) return '';
+    return this._sanitizePlainTextInput(target.value);
   }
 
   // -- Styles -----------------------------------------------------------
@@ -2108,7 +2124,8 @@ class Simon42DashboardStrategyEditor extends LitElement {
     } = data;
 
     const hass = this._hass!;
-    const selectedCleaningVacuum = this._config.areas_options?.[areaId]?.cleaning_vacuum_entity || '';
+    const selectedCleaningVacuum =
+      (this._config.areas_options?.[areaId]?.cleaning_vacuum_entity as string | undefined) || '';
     const availableVacuums = Object.keys(hass.states)
       .filter((entityId) => entityId.startsWith('vacuum.'))
       .map((entityId) => {
@@ -2147,157 +2164,167 @@ class Simon42DashboardStrategyEditor extends LitElement {
 
     return html`
       <div class="form-row" style="align-items: center; margin-bottom: 10px;">
-        <label for="cleaning-vacuum-${areaId}" style="min-width: 170px;">${localize('editor.area_cleaning_vacuum')}</label>
-        <select id="cleaning-vacuum-${areaId}" style="flex: 1;"
-          @change=${(e: Event) => this._areaCleaningVacuumChanged(areaId, (e.target as HTMLSelectElement).value)}>
+        <label for="cleaning-vacuum-${areaId}" style="min-width: 170px;"
+          >${localize('editor.area_cleaning_vacuum')}</label
+        >
+        <select
+          id="cleaning-vacuum-${areaId}"
+          style="flex: 1;"
+          @change=${(e: Event) => {
+            this._areaCleaningVacuumChanged(areaId, this._readSelectValue(e));
+          }}
+        >
           <option value="">${localize('editor.area_cleaning_vacuum_none')}</option>
-          ${availableVacuums.map((vacuum) => html`
-            <option value=${vacuum.entity_id} ?selected=${selectedCleaningVacuum === vacuum.entity_id}>
-              ${vacuum.name}
-            </option>
-          `)}
+          ${availableVacuums.map(
+            (vacuum) => html`
+              <option value=${vacuum.entity_id} ?selected=${selectedCleaningVacuum === vacuum.entity_id}>
+                ${vacuum.name}
+              </option>
+            `
+          )}
         </select>
       </div>
       <div class="description" style="margin-bottom: 10px;">${localize('editor.area_cleaning_vacuum_desc')}</div>
       ${!showEntityGroups
         ? html`<div class="empty-state">${localize('editor.no_entities_in_area')}</div>`
         : html`
-      <div class="entity-groups">
-        ${domainGroups.map((group) => {
-          const entities = (groupedEntities[group.key] || []) as string[];
-          const soilMoistureAdditional =
-            group.key === 'soil_moisture'
-              ? additionalSoilMoisture.filter((entityId) => !entities.includes(entityId))
-              : [];
-          const soilMoistureAvailable = group.key === 'soil_moisture' ? availableSoilMoistureEntities : [];
-          const groupCount = entities.length + soilMoistureAdditional.length;
+            <div class="entity-groups">
+              ${domainGroups.map((group) => {
+                const entities = (groupedEntities[group.key] || []) as string[];
+                const soilMoistureAdditional =
+                  group.key === 'soil_moisture'
+                    ? additionalSoilMoisture.filter((entityId) => !entities.includes(entityId))
+                    : [];
+                const soilMoistureAvailable = group.key === 'soil_moisture' ? availableSoilMoistureEntities : [];
+                const groupCount = entities.length + soilMoistureAdditional.length;
 
-          if (groupCount === 0 && soilMoistureAvailable.length === 0) return nothing;
+                if (groupCount === 0 && soilMoistureAvailable.length === 0) return nothing;
 
-          const hiddenInGroup = (hiddenEntities[group.key] || []) as string[];
-          const allHidden = entities.length > 0 && entities.every((e) => hiddenInGroup.includes(e));
-          const someHidden = entities.some((e) => hiddenInGroup.includes(e)) && !allHidden;
-          const isGroupExpanded = expandedGroups.has(group.key);
+                const hiddenInGroup = (hiddenEntities[group.key] || []) as string[];
+                const allHidden = entities.length > 0 && entities.every((e) => hiddenInGroup.includes(e));
+                const someHidden = entities.some((e) => hiddenInGroup.includes(e)) && !allHidden;
+                const isGroupExpanded = expandedGroups.has(group.key);
 
-          return html`
-            <div class="entity-group" data-group=${group.key}>
-              <div class="entity-group-header" @click=${() => this._toggleGroupExpand(areaId, group.key)}>
-                <input
-                  type="checkbox"
-                  class="group-checkbox"
-                  data-area-id=${areaId}
-                  data-group=${group.key}
-                  ?checked=${!allHidden}
-                  .indeterminate=${someHidden}
-                  @click=${(e: Event) => e.stopPropagation()}
-                  @change=${(e: Event) => {
-                    e.stopPropagation();
-                    const checked = (e.target as HTMLInputElement).checked;
-                    this._groupVisibilityChanged(areaId, group.key, checked, entities);
-                  }}
-                />
-                <ha-icon icon=${group.icon}></ha-icon>
-                <span class="group-name">${group.label}</span>
-                <span class="entity-count">(${groupCount})</span>
-                <button
-                  class="expand-button-small ${isGroupExpanded ? 'expanded' : ''}"
-                  @click=${(e: Event) => {
-                    e.stopPropagation();
-                    this._toggleGroupExpand(areaId, group.key);
-                  }}
-                >
-                  <span class="expand-icon-small">&#x25B6;</span>
-                </button>
-              </div>
-              ${isGroupExpanded
-                ? html`
-                    <div class="entity-list" data-area-id=${areaId} data-group=${group.key}>
-                      ${entities.map((entityId) => {
-                        const stateObj = hass.states[entityId];
-                        const name = stateObj?.attributes.friendly_name || entityId.split('.')[1].replace(/_/g, ' ');
-                        const isEntityHidden = hiddenInGroup.includes(entityId);
-                        return html`
-                          <div class="entity-item">
-                            <input
-                              type="checkbox"
-                              class="entity-checkbox"
-                              ?checked=${!isEntityHidden}
-                              @change=${(e: Event) =>
-                                this._entityVisibilityChanged(
-                                  areaId,
-                                  group.key,
-                                  entityId,
-                                  (e.target as HTMLInputElement).checked
-                                )}
-                            />
-                            <span class="entity-name">${name}</span>
-                            <span class="entity-id">${entityId}</span>
-                          </div>
-                        `;
-                      })}
-                      ${group.key === 'soil_moisture' && soilMoistureAdditional.length > 0
-                        ? html`
-                            <div class="badge-separator">${localize('editor.badges_additional')}</div>
-                            ${soilMoistureAdditional.map((entityId) => {
+                return html`
+                  <div class="entity-group" data-group=${group.key}>
+                    <div class="entity-group-header" @click=${() => this._toggleGroupExpand(areaId, group.key)}>
+                      <input
+                        type="checkbox"
+                        class="group-checkbox"
+                        data-area-id=${areaId}
+                        data-group=${group.key}
+                        ?checked=${!allHidden}
+                        .indeterminate=${someHidden}
+                        @click=${(e: Event) => e.stopPropagation()}
+                        @change=${(e: Event) => {
+                          e.stopPropagation();
+                          const checked = (e.target as HTMLInputElement).checked;
+                          this._groupVisibilityChanged(areaId, group.key, checked, entities);
+                        }}
+                      />
+                      <ha-icon icon=${group.icon}></ha-icon>
+                      <span class="group-name">${group.label}</span>
+                      <span class="entity-count">(${groupCount})</span>
+                      <button
+                        class="expand-button-small ${isGroupExpanded ? 'expanded' : ''}"
+                        @click=${(e: Event) => {
+                          e.stopPropagation();
+                          this._toggleGroupExpand(areaId, group.key);
+                        }}
+                      >
+                        <span class="expand-icon-small">&#x25B6;</span>
+                      </button>
+                    </div>
+                    ${isGroupExpanded
+                      ? html`
+                          <div class="entity-list" data-area-id=${areaId} data-group=${group.key}>
+                            ${entities.map((entityId) => {
                               const stateObj = hass.states[entityId];
                               const name =
                                 stateObj?.attributes.friendly_name || entityId.split('.')[1].replace(/_/g, ' ');
-
+                              const isEntityHidden = hiddenInGroup.includes(entityId);
                               return html`
-                                <div class="entity-item badge-additional-item">
+                                <div class="entity-item">
+                                  <input
+                                    type="checkbox"
+                                    class="entity-checkbox"
+                                    ?checked=${!isEntityHidden}
+                                    @change=${(e: Event) =>
+                                      this._entityVisibilityChanged(
+                                        areaId,
+                                        group.key,
+                                        entityId,
+                                        (e.target as HTMLInputElement).checked
+                                      )}
+                                  />
                                   <span class="entity-name">${name}</span>
                                   <span class="entity-id">${entityId}</span>
-                                  <button
-                                    class="badge-remove-btn"
-                                    title=${localize('editor.badges_remove')}
-                                    @click=${() => this._soilMoistureAdditionalChanged(areaId, entityId, false)}
-                                  >
-                                    &#x2715;
-                                  </button>
                                 </div>
                               `;
                             })}
-                          `
-                        : nothing}
-                      ${group.key === 'soil_moisture' && soilMoistureAvailable.length > 0
-                        ? html`
-                            <div class="badge-add-section">
-                              <select class="soil-moisture-entity-picker" data-area-id=${areaId}>
-                                <option value="">${localize('editor.badges_select_entity')}</option>
-                                ${soilMoistureAvailable.map(
-                                  (e) => html` <option value=${e.entity_id}>${e.name} (${e.entity_id})</option> `
-                                )}
-                              </select>
-                              <button
-                                class="badge-add-button"
-                                @click=${(e: Event) => this._addSoilMoistureFromPicker(e, areaId)}
-                              >
-                                ${localize('editor.badges_add')}
-                              </button>
-                            </div>
-                          `
-                        : nothing}
-                    </div>
-                  `
+                            ${group.key === 'soil_moisture' && soilMoistureAdditional.length > 0
+                              ? html`
+                                  <div class="badge-separator">${localize('editor.badges_additional')}</div>
+                                  ${soilMoistureAdditional.map((entityId) => {
+                                    const stateObj = hass.states[entityId];
+                                    const name =
+                                      stateObj?.attributes.friendly_name || entityId.split('.')[1].replace(/_/g, ' ');
+
+                                    return html`
+                                      <div class="entity-item badge-additional-item">
+                                        <span class="entity-name">${name}</span>
+                                        <span class="entity-id">${entityId}</span>
+                                        <button
+                                          class="badge-remove-btn"
+                                          title=${localize('editor.badges_remove')}
+                                          @click=${() => this._soilMoistureAdditionalChanged(areaId, entityId, false)}
+                                        >
+                                          &#x2715;
+                                        </button>
+                                      </div>
+                                    `;
+                                  })}
+                                `
+                              : nothing}
+                            ${group.key === 'soil_moisture' && soilMoistureAvailable.length > 0
+                              ? html`
+                                  <div class="badge-add-section">
+                                    <select class="soil-moisture-entity-picker" data-area-id=${areaId}>
+                                      <option value="">${localize('editor.badges_select_entity')}</option>
+                                      ${soilMoistureAvailable.map(
+                                        (e) => html` <option value=${e.entity_id}>${e.name} (${e.entity_id})</option> `
+                                      )}
+                                    </select>
+                                    <button
+                                      class="badge-add-button"
+                                      @click=${(e: Event) => this._addSoilMoistureFromPicker(e, areaId)}
+                                    >
+                                      ${localize('editor.badges_add')}
+                                    </button>
+                                  </div>
+                                `
+                              : nothing}
+                          </div>
+                        `
+                      : nothing}
+                  </div>
+                `;
+              })}
+              ${hasBadges
+                ? this._renderBadgeGroup(
+                    areaId,
+                    badgeCandidates,
+                    additionalBadges,
+                    availableEntities,
+                    hiddenEntities,
+                    defaultShowNames,
+                    namesVisible,
+                    namesHidden,
+                    expandedGroups
+                  )
                 : nothing}
             </div>
-          `;
-        })}
-        ${hasBadges
-          ? this._renderBadgeGroup(
-              areaId,
-              badgeCandidates,
-              additionalBadges,
-              availableEntities,
-              hiddenEntities,
-              defaultShowNames,
-              namesVisible,
-              namesHidden,
-              expandedGroups
-            )
-          : nothing}
-      </div>
-      `}
+          `}
     `;
   }
 
@@ -2561,10 +2588,12 @@ class Simon42DashboardStrategyEditor extends LitElement {
     this._fireConfigChanged(newConfig);
   }
 
-
   private _areaCleaningVacuumChanged(areaId: string, vacuumEntityId: string): void {
-    const currentAreaOptions = this._config.areas_options?.[areaId] || {};
-    const newAreaOptions: Record<string, any> = { ...currentAreaOptions };
+    const safeAreaId = this._sanitizeAreaId(areaId);
+    if (!safeAreaId) return;
+
+    const currentAreaOptions = (this._config.areas_options?.[safeAreaId] as AreaOptions | undefined) || {};
+    const newAreaOptions: AreaOptions = { ...currentAreaOptions };
 
     if (vacuumEntityId) {
       newAreaOptions.cleaning_vacuum_entity = vacuumEntityId;
@@ -2572,15 +2601,11 @@ class Simon42DashboardStrategyEditor extends LitElement {
       delete newAreaOptions.cleaning_vacuum_entity;
     }
 
-    const newAreasOptions: Record<string, any> = {
-      ...(this._config.areas_options || {}),
-    };
-
-    if (Object.keys(newAreaOptions).length === 0) {
-      delete newAreasOptions[areaId];
-    } else {
-      newAreasOptions[areaId] = newAreaOptions;
+    const remainingEntries = Object.entries(this._config.areas_options || {}).filter(([id]) => id !== safeAreaId);
+    if (Object.keys(newAreaOptions).length > 0) {
+      remainingEntries.push([safeAreaId, newAreaOptions]);
     }
+    const newAreasOptions = Object.fromEntries(remainingEntries) as Record<string, AreaOptions>;
 
     const newConfig: Simon42StrategyConfig = { ...this._config };
     if (Object.keys(newAreasOptions).length === 0) {
@@ -2591,7 +2616,7 @@ class Simon42DashboardStrategyEditor extends LitElement {
 
     this._config = newConfig;
     this._fireConfigChanged(newConfig);
-    this._refreshAreaCache(areaId);
+    this._refreshAreaCache(safeAreaId);
   }
 
   private _alarmEntityChanged(e: Event): void {

@@ -10,7 +10,7 @@ import type {
   LovelaceBadgeConfig,
 } from '../types/lovelace';
 import type { AreaRegistryEntry } from '../types/registries';
-import type { RoomEntities, SensorEntities } from '../types/strategy';
+import type { RoomEntities, SensorEntities, Simon42StrategyConfig } from '../types/strategy';
 import { stripAreaName, sortByLastChanged } from '../utils/name-utils';
 import { Registry } from '../Registry';
 import { timeStart, timeEnd, debugLog } from '../utils/debug';
@@ -25,6 +25,24 @@ const MEDIA_STOP = 4096;
 const VACUUM_PAUSE = 2;
 const VACUUM_STOP = 4;
 const VACUUM_RETURN_HOME = 8;
+
+type RoomGenerateConfig = {
+  area: AreaRegistryEntry;
+  dashboardConfig?: Simon42StrategyConfig;
+  groups_options?: Record<string, unknown>;
+};
+
+function isRoomGenerateConfig(value: unknown): value is RoomGenerateConfig {
+  if (typeof value !== 'object' || value === null) return false;
+  return 'area' in value;
+}
+
+function getStateByEntityId(hass: HomeAssistant, entityId: string): HassEntity | undefined {
+  if (!/^[a-z0-9_]+\.[a-z0-9_]+$/i.test(entityId)) return undefined;
+  const state = Reflect.get(hass.states, entityId);
+  if (!state || typeof state !== 'object') return undefined;
+  return state as HassEntity;
+}
 
 /** Check if a fan supports speed control */
 function fanSupportsSpeed(state: HassEntity): boolean {
@@ -51,7 +69,8 @@ function getNextVacuumFanSpeed(state: HassEntity): string | number | undefined {
   if (currentIndex === -1) return fanSpeedList[0] as string | number;
 
   const nextIndex = (currentIndex + 1) % fanSpeedList.length;
-  return fanSpeedList[nextIndex] as string | number;
+  const nextSpeed = fanSpeedList.slice(nextIndex, nextIndex + 1)[0];
+  return nextSpeed as string | number;
 }
 
 function buildRoomCleaningBadges(
@@ -165,7 +184,11 @@ function buildRoomCleaningBadges(
 }
 
 class Simon42ViewRoomStrategy extends HTMLElement {
-  static async generate(config: any, hass: HomeAssistant): Promise<LovelaceViewConfig> {
+  static async generate(config: unknown, hass: HomeAssistant): Promise<LovelaceViewConfig> {
+    if (!isRoomGenerateConfig(config)) {
+      throw new Error('Invalid room strategy config');
+    }
+
     const area: AreaRegistryEntry = config.area;
     debugLog(`room-generate-${area.area_id}: called at ${performance.now().toFixed(1)}ms after page load`);
     timeStart(`room-generate-${area.area_id}`);
@@ -220,7 +243,7 @@ class Simon42ViewRoomStrategy extends HTMLElement {
       const entityId = entity.entity_id;
 
       // State check
-      const state = hass.states[entityId];
+      const state = getStateByEntityId(hass, entityId);
       if (!state) continue;
 
       // Domain categorization
@@ -360,7 +383,7 @@ class Simon42ViewRoomStrategy extends HTMLElement {
 
     const soilMoistureAdditional = groupsOptions.soil_moisture?.additional || [];
     for (const entityId of soilMoistureAdditional) {
-      if (!hass.states[entityId]) continue;
+      if (!getStateByEntityId(hass, entityId)) continue;
       if (!roomEntities.soil_moisture.includes(entityId)) {
         roomEntities.soil_moisture.push(entityId);
       }
@@ -394,14 +417,14 @@ class Simon42ViewRoomStrategy extends HTMLElement {
 
     if (
       area.temperature_entity_id &&
-      hass.states[area.temperature_entity_id] &&
+      getStateByEntityId(hass, area.temperature_entity_id) &&
       !Registry.isEntityExcluded(area.temperature_entity_id)
     ) {
       primaryTemp = area.temperature_entity_id;
     }
     if (
       area.humidity_entity_id &&
-      hass.states[area.humidity_entity_id] &&
+      getStateByEntityId(hass, area.humidity_entity_id) &&
       !Registry.isEntityExcluded(area.humidity_entity_id)
     ) {
       primaryHumidity = area.humidity_entity_id;
@@ -422,7 +445,7 @@ class Simon42ViewRoomStrategy extends HTMLElement {
     // Auto-detected sensors (first match per type, except window/door which show all)
     // Colors from shared BADGE_COLOR_MAP, show_name from shared isDefaultShowName()
     const addCandidate = (entityId: string, colorKey: string, dcOverride?: string) => {
-      const dc = dcOverride || (hass.states[entityId]?.attributes?.device_class as string | undefined);
+      const dc = dcOverride || (getStateByEntityId(hass, entityId)?.attributes?.device_class as string | undefined);
       candidates.push({
         entity: entityId,
         color: BADGE_COLOR_MAP[colorKey] || 'grey',
@@ -461,7 +484,7 @@ class Simon42ViewRoomStrategy extends HTMLElement {
       }
       if (badgeOpts.additional?.length) {
         for (const entityId of badgeOpts.additional) {
-          if (hass.states[entityId] && !filteredCandidates.some((b) => b.entity === entityId)) {
+          if (getStateByEntityId(hass, entityId) && !filteredCandidates.some((b) => b.entity === entityId)) {
             filteredCandidates.push({ entity: entityId, color: getColorForEntity(entityId, hass) });
           }
         }
@@ -492,8 +515,9 @@ class Simon42ViewRoomStrategy extends HTMLElement {
     const cleaningVacuumEntity = dashboardConfig.areas_options?.[area.area_id]?.cleaning_vacuum_entity as
       | string
       | undefined;
-    if (cleaningVacuumEntity && hass.states[cleaningVacuumEntity]) {
-      badges.push(...buildRoomCleaningBadges(area.area_id, cleaningVacuumEntity, hass.states[cleaningVacuumEntity]));
+    const cleaningVacuumState = cleaningVacuumEntity ? getStateByEntityId(hass, cleaningVacuumEntity) : undefined;
+    if (cleaningVacuumEntity && cleaningVacuumState) {
+      badges.push(...buildRoomCleaningBadges(area.area_id, cleaningVacuumEntity, cleaningVacuumState));
     }
 
     // === SECTIONS ===
@@ -503,7 +527,7 @@ class Simon42ViewRoomStrategy extends HTMLElement {
     if (roomEntities.cameras.length > 0) {
       const cameraCards: LovelaceCardConfig[] = [];
       for (const cameraId of roomEntities.cameras) {
-        if (!hass.states[cameraId]) continue;
+        if (!getStateByEntityId(hass, cameraId)) continue;
         const camEntity = Registry.getEntity(cameraId);
         const deviceId = camEntity?.device_id;
 
@@ -524,29 +548,29 @@ class Simon42ViewRoomStrategy extends HTMLElement {
 
           // Reolink-specific entities
           const spotlight = devEntities.find(
-            (id) => id.startsWith('light.') && hass.states[id] && !Registry.isEntityExcluded(id)
+            (id) => id.startsWith('light.') && getStateByEntityId(hass, id) && !Registry.isEntityExcluded(id)
           );
           const motion = devEntities.find(
             (id) =>
               id.startsWith('binary_sensor.') &&
-              hass.states[id]?.attributes?.device_class === 'motion' &&
+              getStateByEntityId(hass, id)?.attributes?.device_class === 'motion' &&
               !Registry.isEntityExcluded(id)
           );
           const siren = devEntities.find(
-            (id) => id.startsWith('siren.') && hass.states[id] && !Registry.isEntityExcluded(id)
+            (id) => id.startsWith('siren.') && getStateByEntityId(hass, id) && !Registry.isEntityExcluded(id)
           );
 
           // Aqara-specific entities
           const battery = devEntities.find(
             (id) =>
               id.startsWith('sensor.') &&
-              hass.states[id]?.attributes?.device_class === 'battery' &&
+              getStateByEntityId(hass, id)?.attributes?.device_class === 'battery' &&
               !Registry.isEntityExcluded(id)
           );
           const doorbell = devEntities.find(
             (id) =>
               id.startsWith('event.') &&
-              hass.states[id]?.attributes?.device_class === 'doorbell' &&
+              getStateByEntityId(hass, id)?.attributes?.device_class === 'doorbell' &&
               !Registry.isEntityExcluded(id)
           );
 
@@ -696,7 +720,7 @@ class Simon42ViewRoomStrategy extends HTMLElement {
     }));
 
     domainSection(roomEntities.media_player, localize('room.media'), 'mdi:speaker', (e) => {
-      const state = hass.states[e];
+      const state = getStateByEntityId(hass, e);
       const hasPlayback = state && mediaPlayerSupportsPlayback(state);
       return {
         type: 'tile',
@@ -729,7 +753,7 @@ class Simon42ViewRoomStrategy extends HTMLElement {
         state_content: 'last_changed',
       });
     for (const e of roomEntities.fan) {
-      const state = hass.states[e];
+      const state = getStateByEntityId(hass, e);
       const hasSpeed = state && fanSupportsSpeed(state);
       miscCards.push({
         type: 'tile',
@@ -750,8 +774,8 @@ class Simon42ViewRoomStrategy extends HTMLElement {
       });
 
     miscCards.sort((a, b) => {
-      const sA = hass.states[a.entity];
-      const sB = hass.states[b.entity];
+      const sA = getStateByEntityId(hass, a.entity);
+      const sB = getStateByEntityId(hass, b.entity);
       if (!sA || !sB) return 0;
       return new Date(sB.last_changed).getTime() - new Date(sA.last_changed).getTime();
     });
