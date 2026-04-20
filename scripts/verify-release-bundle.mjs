@@ -1,20 +1,19 @@
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const distDir = fileURLToPath(new URL('../dist/', import.meta.url));
-const entryFile = fileURLToPath(new URL('../dist/simon42-dashboard-strategy.js', import.meta.url));
+process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 
-if (!fs.existsSync(distDir)) {
+if (!fs.existsSync('dist')) {
   console.error('dist directory missing (build did not run or failed)');
   process.exit(1);
 }
 
-if (!fs.existsSync(entryFile)) {
+if (!fs.existsSync('dist/simon42-dashboard-strategy.js')) {
   console.error('dist/simon42-dashboard-strategy.js missing');
   process.exit(1);
 }
 
-const files = fs.readdirSync(distDir);
+const files = fs.readdirSync('dist');
 
 const requiredChunkPatterns = {
   core: /^simon42-dashboard-strategy-core\.[a-f0-9]{8}\.js$/,
