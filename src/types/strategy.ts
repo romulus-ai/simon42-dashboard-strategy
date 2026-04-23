@@ -30,6 +30,7 @@ export interface Simon42StrategyConfig {
   nested_light_groups?: boolean; // default: false
   show_security_summary?: boolean; // default: true
   show_battery_summary?: boolean; // default: true
+  show_unknown_battery_group?: boolean; // default: false
   show_valves_summary?: boolean; // default: false
   show_climate_summary?: boolean; // default: false
   hide_mobile_app_batteries?: boolean; // default: false
