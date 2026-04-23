@@ -160,7 +160,6 @@ export function createAreasSection(
           type: 'heading',
           heading_style: 'title',
           heading: localize('sections.areas'),
-          icon: 'mdi:sofa',
         },
         ...visibleAreas.map((area) => buildAreaCard(area, hass as HomeAssistant)),
       ],

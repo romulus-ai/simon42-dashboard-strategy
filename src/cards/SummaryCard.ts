@@ -5,11 +5,9 @@
 import { LitElement, html, css, type PropertyValues } from 'lit';
 import type { HomeAssistant, HassEntity } from '../types/homeassistant';
 import { Registry } from '../Registry';
-import { type BatteryStatus, type RecBatteryStatus, type BatteryStatusGroup,
-  buildBatteryStatusGroups, getBatteryStatusDisplay, getBatteryStatusGroup } from '../utils/battery-utils';
 import { trackHassUpdate, debugLog, timeStart, timeEnd } from '../utils/debug';
 import { localize } from '../utils/localize';
-import { SECURITY_EXCLUDED_PLATFORMS } from '../utils/entity-filter';
+import { getBatteryEntities, SECURITY_EXCLUDED_PLATFORMS } from '../utils/entity-filter';
 
 declare global {
   interface Window {
@@ -22,9 +20,7 @@ type SummaryType = 'lights' | 'covers' | 'security' | 'batteries' | 'valves' | '
 interface SummaryCardConfig {
   summary_type: SummaryType;
   hide_mobile_app_batteries?: boolean;
-  show_unknown_battery_group?: boolean;
   battery_critical_threshold?: number;
-  battery_low_threshold?: number;
 }
 
 interface DisplayConfig {
@@ -46,43 +42,7 @@ const COLOR_MAP: Record<string, string> = {
   red: 'var(--red-color, #f44336)',
   blue: 'var(--blue-color, #03a9f4)',
   grey: 'var(--disabled-color, #bdbdbd)',
-  white: 'var(--white-color, #eeeeee)',
 };
-
-const CSS_STYLES = css`
-  :host {
-    display: block;
-    cursor: pointer;
-  }
-  ha-card {
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    gap: 8px;
-    height: 100%;
-    box-sizing: border-box;
-    --ha-card-border-width: 0;
-    background: var(--ha-card-background, var(--card-background-color, #fff));
-    border-radius: var(--ha-card-border-radius, 12px);
-  }
-  ha-card:active {
-    transform: scale(0.97);
-    transition: transform 0.1s;
-  }
-  .icon {
-    --mdc-icon-size: 28px;
-    transition: color 0.3s;
-  }
-  .name {
-    font-size: 13px;
-    font-weight: 500;
-    line-height: 1.2;
-    color: var(--primary-text-color);
-  }
-`;
 
 class Simon42SummaryCard extends LitElement {
   static properties = {
@@ -94,13 +54,44 @@ class Simon42SummaryCard extends LitElement {
   private _count = 0;
   private _config!: SummaryCardConfig;
   private _relevantEntityIds: Set<string> | null = null;
-  private _batteryPair!: { status: BatteryStatus, group: BatteryStatusGroup };
 
-  static styles = CSS_STYLES;
+  static styles = css`
+    :host {
+      display: block;
+      cursor: pointer;
+    }
+    ha-card {
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 8px;
+      height: 100%;
+      box-sizing: border-box;
+      --ha-card-border-width: 0;
+      background: var(--ha-card-background, var(--card-background-color, #fff));
+      border-radius: var(--ha-card-border-radius, 12px);
+    }
+    ha-card:active {
+      transform: scale(0.97);
+      transition: transform 0.1s;
+    }
+    .icon {
+      --mdc-icon-size: 28px;
+      transition: color 0.3s;
+    }
+    .name {
+      font-size: 13px;
+      font-weight: 500;
+      line-height: 1.2;
+      color: var(--primary-text-color);
+    }
+  `;
 
   setConfig(config: SummaryCardConfig): void {
     this._config = config;
-    this._count = 0;
     this._relevantEntityIds = null;
   }
 
@@ -111,12 +102,10 @@ class Simon42SummaryCard extends LitElement {
     const oldHass = changedProps.get('hass') as HomeAssistant | undefined;
 
     if (!oldHass || oldHass.entities !== this.hass.entities) {
-      this._count = 0;
       this._relevantEntityIds = null;
       debugLog(`summary-${this._config.summary_type}: cache invalidated (registry changed)`);
     }
 
-    this._getRelevantEntities();
     const newCount = this._calculateCount();
     if (this._count !== newCount) {
       this._count = newCount;
@@ -187,15 +176,7 @@ class Simon42SummaryCard extends LitElement {
       }
 
       case 'batteries': {
-        const batteryGroups: RecBatteryStatus = buildBatteryStatusGroups(this.hass, this._config);
-        const statusOrder: BatteryStatus[] = ['critical', 'unknown', 'good'];
-
-        for (const status of statusOrder) {
-          const group = getBatteryStatusGroup(batteryGroups, status);
-          this._batteryPair = { status, group };
-          if (group.entities.length > 0) break;
-        }
-        result = this._batteryPair.group.entities;
+        result = getBatteryEntities(hass, this._config);
         break;
       }
 
@@ -222,8 +203,9 @@ class Simon42SummaryCard extends LitElement {
   }
 
   private _calculateCount(): number {
-
     if (!this.hass) return 0;
+
+    this._getRelevantEntities();
     if (!this._relevantEntityIds || this._relevantEntityIds.size === 0) return 0;
 
     const hass = this.hass;
@@ -254,7 +236,21 @@ class Simon42SummaryCard extends LitElement {
         return count;
 
       case 'batteries': {
-        return this._relevantEntityIds.size;
+        const critThreshold = this._config.battery_critical_threshold ?? 20;
+        for (const id of this._relevantEntityIds) {
+          const state = hass.states[id];
+          if (!state) continue;
+          if (id.startsWith('binary_sensor.')) {
+            if (state.state === 'on') count++;
+          } else {
+            const unit = state.attributes?.unit_of_measurement;
+            if (unit && unit !== '%') continue;
+            const value = parseFloat(state.state);
+            const isUnavailable = state.state === 'unavailable' || state.state === 'unknown';
+            if (isUnavailable || (!isNaN(value) && value < critThreshold)) count++;
+          }
+        }
+        return count;
       }
 
       case 'valves':
@@ -328,68 +324,8 @@ class Simon42SummaryCard extends LitElement {
         path: 'climate',
       },
     };
-    switch (this._config.summary_type) {
-      case 'lights':
-        return {
-          icon: 'mdi:lamps',
-          name: hasItems
-            ? `${count} ${count === 1 ? localize('summary.lights_on_one') : localize('summary.lights_on_many')}`
-            : localize('summary.lights_off'),
-          color: hasItems ? 'orange' : 'grey',
-          path: 'lights',
-        };
 
-      case 'covers':
-        return {
-          icon: 'mdi:blinds-horizontal',
-          name: hasItems
-            ? `${count} ${count === 1 ? localize('summary.covers_open_one') : localize('summary.covers_open_many')}`
-            : localize('summary.covers_closed'),
-          color: hasItems ? 'purple' : 'grey',
-          path: 'covers',
-        };
-
-      case 'security':
-        return {
-          icon: 'mdi:security',
-          name: hasItems
-            ? `${count} ${localize('summary.security_unsafe')}`
-            : localize('summary.security_safe'),
-          color: hasItems ? 'yellow' : 'grey',
-          path: 'security',
-        };
-
-      case 'batteries': {
-        const status = this._batteryPair.status;
-        const display = getBatteryStatusDisplay(this._config, status);
-        return {
-          icon: display.icon,
-          name: status !== 'good'
-            ? `${count} ${count === 1? localize(`summary.batteries_${status}_one`) : localize(`summary.batteries_${status}_many`)}`
-            : localize('summary.batteries_ok'),
-          color: display.color,
-          path: 'batteries',
-        };
-      }
-
-      case 'climate':
-        return {
-          icon: 'mdi:thermostat',
-          name: hasItems
-            ? `${count} ${count === 1 ? localize('summary.climate_active_one') : localize('summary.climate_active_many')}`
-            : localize('summary.climate_off'),
-          color: hasItems ? 'orange' : 'grey',
-          path: 'climate',
-        };
-
-      default:
-        return {
-          icon: 'mdi:help-circle-outline',
-          name: '',
-          color: 'grey',
-          path: '',
-        };
-    }
+    return configs[this._config.summary_type];
   }
 
   private _handleClick(): void {
