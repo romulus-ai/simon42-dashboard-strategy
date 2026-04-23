@@ -206,9 +206,10 @@ class Simon42SummaryCard extends LitElement {
         break;
 
       case 'climate':
-        result = Registry.getVisibleEntityIdsForDomain('climate').filter(
-          (id) => hass.states[id] && this._isEntityRelevant(id, hass.states[id])
-        );
+                result = [
+          ...Registry.getVisibleEntityIdsForDomain('climate'),
+          ...Registry.getVisibleEntityIdsForDomain('humidifier'),
+        ].filter((id) => hass.states[id] && this._isEntityRelevant(id, hass.states[id]));
         break;
 
       default:

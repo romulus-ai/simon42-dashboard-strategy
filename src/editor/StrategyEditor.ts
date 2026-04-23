@@ -3886,6 +3886,8 @@ async function getAreaGroupedEntities(areaId: string, hass: HomeAssistant): Prom
       roomEntities.scenes.push(entity.entity_id);
     } else if (domain === 'climate') {
       roomEntities.climate.push(entity.entity_id);
+    } else if (domain === 'humidifier') {
+      roomEntities.climate.push(entity.entity_id);
     } else if (domain === 'media_player') {
       roomEntities.media_player.push(entity.entity_id);
     } else if (domain === 'vacuum') {
