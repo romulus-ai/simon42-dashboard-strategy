@@ -334,7 +334,7 @@ class Simon42SummaryCard extends LitElement {
                 : localize(`summary.batteries_${batterySummaryStatus}_many`)
             }`
           : localize('summary.batteries_ok'),
-        color: hasItems ? (batterySummaryStatus === 'unknown' ? 'white' : 'red') : 'grey',
+        color: hasItems ? (batterySummaryStatus === 'unknown' ? 'cyan' : 'red') : 'grey',
         path: 'batteries',
       },
       valves: {
