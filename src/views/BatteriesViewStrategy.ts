@@ -10,22 +10,23 @@ import { getBatteryEntities } from '../utils/entity-filter';
 
 function createBatterySection(
   entities: string[],
-  status: 'critical' | 'low' | 'good',
-  rangeText: string,
+  status: 'critical' | 'low' | 'good' | 'unknown',
+  rangeText: string | null
 ): LovelaceSectionConfig | null {
   if (entities.length === 0) return null;
 
-  const emoji = status === 'critical' ? '🔴' : status === 'low' ? '🟡' : '🟢';
-  const color = status === 'critical' ? 'red' : status === 'low' ? 'yellow' : 'green';
+  const emoji = status === 'critical' ? '🔴' : status === 'low' ? '🟡' : status === 'unknown' ? '⚪' : '🟢';
+  const color = status === 'critical' ? 'red' : status === 'low' ? 'yellow' : status === 'unknown' ? 'grey' : 'green';
+  const headingRange = rangeText ? ` (${rangeText})` : '';
 
   return {
     type: 'grid',
     cards: [
       {
         type: 'heading',
-        heading: `${emoji} ${localize('batteries.' + status)} (${rangeText}) - ${entities.length} ${
-          localize(entities.length === 1 ? 'batteries.battery_one' : 'batteries.battery_many')
-        }`,
+        heading: `${emoji} ${localize('batteries.' + status)}${headingRange} - ${entities.length} ${localize(
+          entities.length === 1 ? 'batteries.battery_one' : 'batteries.battery_many'
+        )}`,
         heading_style: 'title',
       },
       ...entities.map((e) => ({
@@ -50,9 +51,11 @@ class Simon42ViewBatteriesStrategy extends HTMLElement {
     const strategyConfig = config.config || {};
     const criticalThreshold = strategyConfig.battery_critical_threshold ?? 20;
     const lowThreshold = strategyConfig.battery_low_threshold ?? 50;
+    const showUnknownBatteryGroup = strategyConfig.show_unknown_battery_group === true;
     const critical: string[] = [];
     const low: string[] = [];
     const good: string[] = [];
+    const unknown: string[] = [];
 
     for (const entityId of batteryEntities) {
       const state = hass.states[entityId];
@@ -60,6 +63,12 @@ class Simon42ViewBatteriesStrategy extends HTMLElement {
         (state.state === 'on' ? critical : good).push(entityId);
         continue;
       }
+
+      if (showUnknownBatteryGroup && (state.state === 'unavailable' || state.state === 'unknown')) {
+        unknown.push(entityId);
+        continue;
+      }
+
       const value = parseFloat(state.state);
       const unit = state.attributes?.unit_of_measurement;
       // Only apply percentage thresholds to %-based sensors.
@@ -84,6 +93,7 @@ class Simon42ViewBatteriesStrategy extends HTMLElement {
     critical.sort(sortByLevel);
     low.sort(sortByLevel);
     good.sort(sortByLevel);
+    unknown.sort(sortByLevel);
 
     const sections: LovelaceSectionConfig[] = [];
 
@@ -92,6 +102,9 @@ class Simon42ViewBatteriesStrategy extends HTMLElement {
 
     const lowSection = createBatterySection(low, 'low', `${criticalThreshold}% - ${lowThreshold}%`);
     if (lowSection) sections.push(lowSection);
+
+    const unknownSection = createBatterySection(unknown, 'unknown', null);
+    if (unknownSection) sections.push(unknownSection);
 
     const goodSection = createBatterySection(good, 'good', `> ${lowThreshold}%`);
     if (goodSection) sections.push(goodSection);
