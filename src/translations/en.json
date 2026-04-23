@@ -96,7 +96,9 @@
     "heating": "Heating",
     "cooling": "Cooling",
     "idle": "Idle",
-    "off": "Off"
+    "off": "Off",
+    "dehumidifier": "Dehumidification",
+    "humidity": "Humidification"
   },
   "room": {
     "cameras": "Cameras",

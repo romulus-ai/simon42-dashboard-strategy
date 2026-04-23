@@ -15,15 +15,39 @@ class Simon42ViewClimateStrategy extends HTMLElement {
     const climateIds = Registry.getVisibleEntityIdsForDomain('climate').filter(
       (id) => hass.states[id] !== undefined
     );
+    const humidifierIds = Registry.getVisibleEntityIdsForDomain('humidifier').filter(
+      (id) => hass.states[id] !== undefined
+    );
+    const climateAndHumidifierIds = [...climateIds, ...humidifierIds];
 
     // Group by hvac_action or state
     const heating: string[] = [];
     const cooling: string[] = [];
+    const dehumidifier: string[] = [];
+    const humidity: string[] = [];
     const idle: string[] = [];
     const off: string[] = [];
 
-    for (const id of climateIds) {
+    for (const id of climateAndHumidifierIds) {
       const state = hass.states[id];
+      const domain = id.split('.')[0];
+
+      if (domain === 'humidifier') {
+        const deviceClass = state.attributes?.device_class as string | undefined;
+        const mode = state.attributes?.mode as string | undefined;
+
+        if (state.state === 'off' || state.state === 'unavailable' || state.state === 'unknown') {
+          off.push(id);
+        } else if (deviceClass === 'dehumidifier' || deviceClass === 'dehumidifer') {
+          dehumidifier.push(id);
+        } else if (mode === 'Set' || mode === 'Smart' || mode === 'Continuous' || mode === 'Dry') {
+          humidity.push(id);
+        } else {
+          idle.push(id);
+        }
+        continue;
+      }
+
       const hvacAction = state.attributes?.hvac_action as string | undefined;
       const hvacState = state.state;
 
@@ -60,9 +84,15 @@ class Simon42ViewClimateStrategy extends HTMLElement {
             type: 'tile',
             entity: e,
             vertical: false,
-            features: [{ type: 'climate-hvac-modes' }],
+            features: [
+              {
+                type: e.startsWith('humidifier.') ? 'humidifier-toggle' : 'climate-hvac-modes',
+              },
+            ],
             features_position: 'inline',
-            state_content: ['hvac_action', 'current_temperature'],
+                        state_content: e.startsWith('humidifier.')
+              ? ['mode', 'humidity', 'current_humidity']
+              : ['hvac_action', 'current_temperature'],
           })),
         ],
       });
@@ -70,6 +100,8 @@ class Simon42ViewClimateStrategy extends HTMLElement {
 
     buildSection(heating, localize('climate.heating'), 'mdi:fire');
     buildSection(cooling, localize('climate.cooling'), 'mdi:snowflake');
+    buildSection(dehumidifier, localize('climate.dehumidifier'), 'mdi:air-humidifier-off');
+    buildSection(humidity, localize('climate.humidity'), 'mdi:air-humidifier');
     buildSection(idle, localize('climate.idle'), 'mdi:thermostat');
     buildSection(off, localize('climate.off'), 'mdi:power-off');
 

@@ -96,7 +96,9 @@
     "heating": "Heizen",
     "cooling": "Kühlen",
     "idle": "Bereitschaft",
-    "off": "Aus"
+    "off": "Aus",
+    "dehumidifier": "Luftentfeuchtung",
+    "humidity": "Luftbefeuchtung"
   },
   "room": {
     "cameras": "Kameras",
