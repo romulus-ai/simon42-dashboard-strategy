@@ -370,7 +370,15 @@ class Simon42SummaryCard extends LitElement {
           path: 'batteries',
         };
       }
-
+      case 'valves':
+        return {
+          icon: 'mdi:valve',
+          name: hasItems
+            ? `${count} ${count === 1 ? localize('summary.valves_open_one') : localize('summary.valves_open_many')}`
+            : localize('summary.valves_closed'),
+          color: hasItems ? 'blue' : 'grey',
+          path: 'valves',
+        };
       case 'climate':
         return {
           icon: 'mdi:thermostat',
