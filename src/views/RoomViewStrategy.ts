@@ -275,6 +275,10 @@ class Simon42ViewRoomStrategy extends HTMLElement {
         roomEntities.climate.push(entityId);
         continue;
       }
+      if (domain === 'humidifier') {
+        roomEntities.climate.push(entityId);
+        continue;
+      }
       if (domain === 'media_player') {
         roomEntities.media_player.push(entityId);
         continue;
@@ -663,15 +667,18 @@ class Simon42ViewRoomStrategy extends HTMLElement {
       state_content: 'last_changed',
     }));
 
-    domainSection(roomEntities.climate, localize('room.climate'), 'mdi:thermostat', (e) => ({
-      type: 'tile',
-      entity: e,
-      name: stripAreaName(e, area, hass),
-      features: [{ type: 'climate-hvac-modes' }],
-      features_position: 'inline',
-      vertical: false,
-      state_content: ['hvac_action', 'current_temperature'],
-    }));
+    domainSection(roomEntities.climate, localize('room.climate'), 'mdi:thermostat', (e) => {
+      const isHumidifier = e.startsWith('humidifier.');
+      return {
+        type: 'tile',
+        entity: e,
+        name: stripAreaName(e, area, hass),
+        features: [{ type: isHumidifier ? 'humidifier-toggle' : 'climate-hvac-modes' }],
+        features_position: 'inline',
+        vertical: false,
+        state_content: isHumidifier ? ['humidity', 'current_humidity'] : ['hvac_action', 'current_temperature'],
+      };
+    });
 
     domainSection(roomEntities.valves, localize('room.valves'), 'mdi:valve', (e) => ({
       type: 'tile',
