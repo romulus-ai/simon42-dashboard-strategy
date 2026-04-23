@@ -7,3 +7,7 @@ dist/simon42-dashboard-strategy.js.map
 .DS_Store
 .codacy/
 dist/
+
+
+#Ignore vscode AI rules
+.github\instructions\codacy.instructions.md
