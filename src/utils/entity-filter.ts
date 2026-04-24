@@ -92,14 +92,21 @@ function getAirQualityThresholds(config: Simon42StrategyConfig) {
   };
 }
 
-function detectAirQualityMetric(entityId: string, state: HomeAssistant['states'][string]): AirQualityMetric | null {
-  const deviceClass = state.attributes?.device_class as string | undefined;
-  const unit = (state.attributes?.unit_of_measurement as string | undefined) || '';
-  const lowerId = entityId.toLowerCase();
+function getConfiguredAirQualityEntitiesByMetric(config: Simon42StrategyConfig): Record<AirQualityMetric, string[]> {
+  return {
+    co2: (config.air_quality_entities?.co2 || []).filter((id) => typeof id === 'string' && id.length > 0),
+    humidity: (config.air_quality_entities?.humidity || []).filter((id) => typeof id === 'string' && id.length > 0),
+    temperature: (config.air_quality_entities?.temperature || []).filter(
+      (id) => typeof id === 'string' && id.length > 0
+    ),
+  };
+}
 
-  if (deviceClass === 'carbon_dioxide' || lowerId.includes('co2')) return 'co2';
-  if (deviceClass === 'humidity' || (unit === '%' && !lowerId.includes('battery'))) return 'humidity';
-  if (deviceClass === 'temperature' || unit === '°C' || unit === '°F') return 'temperature';
+function getConfiguredAirQualityMetric(entityId: string, config: Simon42StrategyConfig): AirQualityMetric | null {
+  const configured = getConfiguredAirQualityEntitiesByMetric(config);
+  if (configured.co2.includes(entityId)) return 'co2';
+  if (configured.humidity.includes(entityId)) return 'humidity';
+  if (configured.temperature.includes(entityId)) return 'temperature';
   return null;
 }
 
@@ -124,29 +131,35 @@ function getAirQualityStatus(metric: AirQualityMetric, value: number, config: Si
 }
 
 export function getAirQualityEntities(hass: HomeAssistant, config: Simon42StrategyConfig): AirQualityEntityInfo[] {
-  const sensorIds = Registry.getVisibleEntityIdsForDomain('sensor');
   const result: AirQualityEntityInfo[] = [];
+  const configured = getConfiguredAirQualityEntitiesByMetric(config);
 
-  for (const entityId of sensorIds) {
-    const state = hass.states[entityId];
-    if (!state) continue;
-    if (state.state === 'unavailable' || state.state === 'unknown') continue;
+  for (const metric of ['co2', 'humidity', 'temperature'] as const) {
+    for (const entityId of configured[metric]) {
+      const state = hass.states[entityId];
+      if (!state) continue;
+      if (state.state === 'unavailable' || state.state === 'unknown') continue;
 
-    const value = parseFloat(state.state);
-    if (isNaN(value)) continue;
+      const value = parseFloat(state.state);
+      if (isNaN(value)) continue;
 
-    const metric = detectAirQualityMetric(entityId, state);
-    if (!metric) continue;
-
-    result.push({
-      entityId,
-      metric,
-      value,
-      status: getAirQualityStatus(metric, value, config),
-    });
+      result.push({
+        entityId,
+        metric,
+        value,
+        status: getAirQualityStatus(metric, value, config),
+      });
+    }
   }
 
-  return result;
+  const deduplicatedByEntity = new Map<string, AirQualityEntityInfo>();
+  for (const info of result) {
+    if (!deduplicatedByEntity.has(info.entityId)) {
+      deduplicatedByEntity.set(info.entityId, info);
+    }
+  }
+
+  return Array.from(deduplicatedByEntity.values());
 }
 
 export function getAirQualityEntityInfo(
@@ -161,7 +174,7 @@ export function getAirQualityEntityInfo(
   const value = parseFloat(state.state);
   if (isNaN(value)) return null;
 
-  const metric = detectAirQualityMetric(entityId, state);
+  const metric = getConfiguredAirQualityMetric(entityId, config);
   if (!metric) return null;
 
   return {
