@@ -95,6 +95,7 @@ export function createOverviewSection(data: OverviewSectionParams): LovelaceSect
   const showSecuritySummary = config.show_security_summary !== false;
   const showBatterySummary = config.show_battery_summary !== false;
   const showClimateSummary = config.show_climate_summary === true;
+  const showCameraSummary = config.show_camera_summary === true;
   const showAirQualitySummary = config.show_air_quality_summary === true;
 
   // Build summary cards based on config
@@ -138,6 +139,14 @@ export function createOverviewSection(data: OverviewSectionParams): LovelaceSect
     summaryCards.push({
       type: 'custom:simon42-summary-card',
       summary_type: 'climate',
+      areas_options: config.areas_options || {},
+    });
+  }
+
+  if (showCameraSummary) {
+    summaryCards.push({
+      type: 'custom:simon42-summary-card',
+      summary_type: 'cameras',
       areas_options: config.areas_options || {},
     });
   }

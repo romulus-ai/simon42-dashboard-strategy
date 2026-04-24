@@ -46,6 +46,7 @@ export interface Simon42StrategyConfig {
   air_quality_temperature_warning_max?: number; // default: 27
   air_quality_temperature_critical_min?: number; // default: 16
   air_quality_temperature_critical_max?: number; // default: 30
+  air_quality_entities?: AirQualityEntitiesConfig;
   show_locks_in_rooms?: boolean; // default: false
   show_automations_in_rooms?: boolean; // default: false
   show_scripts_in_rooms?: boolean; // default: false
@@ -85,6 +86,12 @@ export interface Simon42StrategyConfig {
 
   // Custom badges (shown in header next to person chips)
   custom_badges?: CustomBadge[];
+}
+
+export interface AirQualityEntitiesConfig {
+  co2?: string[];
+  humidity?: string[];
+  temperature?: string[];
 }
 
 // -- Area Management --------------------------------------------------
@@ -201,7 +208,15 @@ export interface PersonData {
 
 // -- Summary Types (used by summary cards) ----------------------------
 
-export type SummaryType = 'lights' | 'covers' | 'security' | 'batteries' | 'climate' | 'air_quality';
+export type SummaryType =
+  | 'lights'
+  | 'covers'
+  | 'security'
+  | 'batteries'
+  | 'valves'
+  | 'climate'
+  | 'cameras'
+  | 'air_quality';
 
 // -- Resolved Area (internal, enriched area for rendering) ------------
 

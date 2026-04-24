@@ -43,6 +43,8 @@ interface DomainGroup {
   icon: string;
 }
 
+type AirQualityConfigMetric = 'co2' | 'humidity' | 'temperature';
+
 declare global {
   interface Window {
     customCards?: Array<{ type: string; name: string; description: string }>;
@@ -165,6 +167,35 @@ class Simon42DashboardStrategyEditor extends LitElement {
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 
+  private _getAirQualityEntitiesForMetric(metric: AirQualityConfigMetric): string[] {
+    const list = this._config.air_quality_entities?.[metric] || [];
+    return list.filter((entityId) => this._sanitizeEntityId(entityId));
+  }
+
+  private _getAirQualityEntityCandidates(metric: AirQualityConfigMetric): EntitySelectOption[] {
+    if (!this._hass) return [];
+
+    return Object.keys(this._hass.states)
+      .filter((entityId) => entityId.startsWith('sensor.'))
+      .filter((entityId) => {
+        const state = this._hass!.states[entityId];
+        const deviceClass = state.attributes?.device_class as string | undefined;
+        const lowerId = entityId.toLowerCase();
+
+        if (metric === 'co2') return deviceClass === 'carbon_dioxide' || lowerId.includes('co2');
+        if (metric === 'humidity') return deviceClass === 'humidity';
+        return deviceClass === 'temperature';
+      })
+      .map((entityId) => {
+        const stateObj = this._hass!.states[entityId];
+        return {
+          entity_id: entityId,
+          name: stateObj.attributes?.friendly_name || entityId.split('.')[1].replace(/_/g, ' '),
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
   private _getFilteredEntities(query: string, filterWithArea = false): EntitySelectOption[] {
     if (!this._hass || query.length < 2) return [];
     const q = query.toLowerCase();
@@ -188,6 +219,11 @@ class Simon42DashboardStrategyEditor extends LitElement {
       return aName.localeCompare(bName);
     });
     return filtered.slice(0, 21);
+  }
+
+  private _sanitizeEntityId(entityId: string): string {
+    const value = entityId.trim();
+    return /^[a-z0-9_]+\.[a-z0-9_]+$/i.test(value) ? value : '';
   }
 
   // -- Styles -----------------------------------------------------------
@@ -1308,6 +1344,18 @@ class Simon42DashboardStrategyEditor extends LitElement {
     const airQualityTemperatureWarningMax = this._config.air_quality_temperature_warning_max ?? 27;
     const airQualityTemperatureCriticalMin = this._config.air_quality_temperature_critical_min ?? 16;
     const airQualityTemperatureCriticalMax = this._config.air_quality_temperature_critical_max ?? 30;
+    const selectedAirQualityCo2 = this._getAirQualityEntitiesForMetric('co2');
+    const selectedAirQualityHumidity = this._getAirQualityEntitiesForMetric('humidity');
+    const selectedAirQualityTemperature = this._getAirQualityEntitiesForMetric('temperature');
+    const availableAirQualityCo2 = this._getAirQualityEntityCandidates('co2').filter(
+      (entry) => !selectedAirQualityCo2.includes(entry.entity_id)
+    );
+    const availableAirQualityHumidity = this._getAirQualityEntityCandidates('humidity').filter(
+      (entry) => !selectedAirQualityHumidity.includes(entry.entity_id)
+    );
+    const availableAirQualityTemperature = this._getAirQualityEntityCandidates('temperature').filter(
+      (entry) => !selectedAirQualityTemperature.includes(entry.entity_id)
+    );
 
     return html`
       <div class="section">
@@ -1406,175 +1454,312 @@ class Simon42DashboardStrategyEditor extends LitElement {
         )}
         <div class="description">${localize('editor.show_air_quality_summary_desc')}</div>
 
-        <div style="margin-left: 26px; margin-bottom: 8px;">
-          <div
-            style="font-size: 13px; font-weight: 500; color: var(--primary-text-color); margin-top: 12px; margin-bottom: 4px;"
-          >
-            ${localize('editor.air_quality_thresholds')}
-          </div>
-          <div class="form-row">
-            <label for="air-quality-co2-warning" style="min-width: 140px;"
-              >${localize('editor.air_quality_co2_warning_above')}</label
-            >
-            <input
-              type="number"
-              id="air-quality-co2-warning"
-              min="300"
-              max="10000"
-              .value=${String(airQualityCo2Warning)}
-              style="width: 90px;"
-              @change=${(e: Event) =>
-                this._airQualityThresholdChanged('air_quality_co2_warning_threshold', 1000, 300, 10000, e)}
-            />
-            ppm
-          </div>
-          <div class="form-row">
-            <label for="air-quality-co2-critical" style="min-width: 140px;"
-              >${localize('editor.air_quality_co2_critical_above')}</label
-            >
-            <input
-              type="number"
-              id="air-quality-co2-critical"
-              min="300"
-              max="10000"
-              .value=${String(airQualityCo2Critical)}
-              style="width: 90px;"
-              @change=${(e: Event) =>
-                this._airQualityThresholdChanged('air_quality_co2_critical_threshold', 1500, 300, 10000, e)}
-            />
-            ppm
-          </div>
-          <div class="form-row">
-            <label for="air-quality-humidity-warning-min" style="min-width: 140px;"
-              >${localize('editor.air_quality_humidity_warning_min')}</label
-            >
-            <input
-              type="number"
-              id="air-quality-humidity-warning-min"
-              min="0"
-              max="100"
-              .value=${String(airQualityHumidityWarningMin)}
-              style="width: 70px;"
-              @change=${(e: Event) =>
-                this._airQualityThresholdChanged('air_quality_humidity_warning_min', 35, 0, 100, e)}
-            />
-            %
-          </div>
-          <div class="form-row">
-            <label for="air-quality-humidity-warning-max" style="min-width: 140px;"
-              >${localize('editor.air_quality_humidity_warning_max')}</label
-            >
-            <input
-              type="number"
-              id="air-quality-humidity-warning-max"
-              min="0"
-              max="100"
-              .value=${String(airQualityHumidityWarningMax)}
-              style="width: 70px;"
-              @change=${(e: Event) =>
-                this._airQualityThresholdChanged('air_quality_humidity_warning_max', 60, 0, 100, e)}
-            />
-            %
-          </div>
-          <div class="form-row">
-            <label for="air-quality-humidity-critical-min" style="min-width: 140px;"
-              >${localize('editor.air_quality_humidity_critical_min')}</label
-            >
-            <input
-              type="number"
-              id="air-quality-humidity-critical-min"
-              min="0"
-              max="100"
-              .value=${String(airQualityHumidityCriticalMin)}
-              style="width: 70px;"
-              @change=${(e: Event) =>
-                this._airQualityThresholdChanged('air_quality_humidity_critical_min', 30, 0, 100, e)}
-            />
-            %
-          </div>
-          <div class="form-row">
-            <label for="air-quality-humidity-critical-max" style="min-width: 140px;"
-              >${localize('editor.air_quality_humidity_critical_max')}</label
-            >
-            <input
-              type="number"
-              id="air-quality-humidity-critical-max"
-              min="0"
-              max="100"
-              .value=${String(airQualityHumidityCriticalMax)}
-              style="width: 70px;"
-              @change=${(e: Event) =>
-                this._airQualityThresholdChanged('air_quality_humidity_critical_max', 70, 0, 100, e)}
-            />
-            %
-          </div>
-          <div class="form-row">
-            <label for="air-quality-temperature-warning-min" style="min-width: 140px;"
-              >${localize('editor.air_quality_temperature_warning_min')}</label
-            >
-            <input
-              type="number"
-              id="air-quality-temperature-warning-min"
-              min="-30"
-              max="60"
-              .value=${String(airQualityTemperatureWarningMin)}
-              style="width: 70px;"
-              @change=${(e: Event) =>
-                this._airQualityThresholdChanged('air_quality_temperature_warning_min', 18, -30, 60, e)}
-            />
-            °C
-          </div>
-          <div class="form-row">
-            <label for="air-quality-temperature-warning-max" style="min-width: 140px;"
-              >${localize('editor.air_quality_temperature_warning_max')}</label
-            >
-            <input
-              type="number"
-              id="air-quality-temperature-warning-max"
-              min="-30"
-              max="60"
-              .value=${String(airQualityTemperatureWarningMax)}
-              style="width: 70px;"
-              @change=${(e: Event) =>
-                this._airQualityThresholdChanged('air_quality_temperature_warning_max', 27, -30, 60, e)}
-            />
-            °C
-          </div>
-          <div class="form-row">
-            <label for="air-quality-temperature-critical-min" style="min-width: 140px;"
-              >${localize('editor.air_quality_temperature_critical_min')}</label
-            >
-            <input
-              type="number"
-              id="air-quality-temperature-critical-min"
-              min="-30"
-              max="60"
-              .value=${String(airQualityTemperatureCriticalMin)}
-              style="width: 70px;"
-              @change=${(e: Event) =>
-                this._airQualityThresholdChanged('air_quality_temperature_critical_min', 16, -30, 60, e)}
-            />
-            °C
-          </div>
-          <div class="form-row">
-            <label for="air-quality-temperature-critical-max" style="min-width: 140px;"
-              >${localize('editor.air_quality_temperature_critical_max')}</label
-            >
-            <input
-              type="number"
-              id="air-quality-temperature-critical-max"
-              min="-30"
-              max="60"
-              .value=${String(airQualityTemperatureCriticalMax)}
-              style="width: 70px;"
-              @change=${(e: Event) =>
-                this._airQualityThresholdChanged('air_quality_temperature_critical_max', 30, -30, 60, e)}
-            />
-            °C
-          </div>
-          <div class="description">${localize('editor.air_quality_thresholds_desc')}</div>
-        </div>
+        ${showAirQualitySummary
+          ? html`
+              <div style="margin-left: 26px; margin-bottom: 8px;">
+                <div
+                  style="font-size: 13px; font-weight: 500; color: var(--primary-text-color); margin-top: 12px; margin-bottom: 4px;"
+                >
+                  ${localize('editor.air_quality_thresholds')}
+                </div>
+                <div class="form-row">
+                  <label for="air-quality-co2-warning" style="min-width: 140px;"
+                    >${localize('editor.air_quality_co2_warning_above')}</label
+                  >
+                  <input
+                    type="number"
+                    id="air-quality-co2-warning"
+                    min="300"
+                    max="10000"
+                    .value=${String(airQualityCo2Warning)}
+                    style="width: 90px;"
+                    @change=${(e: Event) =>
+                      this._airQualityThresholdChanged('air_quality_co2_warning_threshold', 1000, 300, 10000, e)}
+                  />
+                  ppm
+                </div>
+                <div class="form-row">
+                  <label for="air-quality-co2-critical" style="min-width: 140px;"
+                    >${localize('editor.air_quality_co2_critical_above')}</label
+                  >
+                  <input
+                    type="number"
+                    id="air-quality-co2-critical"
+                    min="300"
+                    max="10000"
+                    .value=${String(airQualityCo2Critical)}
+                    style="width: 90px;"
+                    @change=${(e: Event) =>
+                      this._airQualityThresholdChanged('air_quality_co2_critical_threshold', 1500, 300, 10000, e)}
+                  />
+                  ppm
+                </div>
+                <div class="form-row">
+                  <label for="air-quality-humidity-warning-min" style="min-width: 140px;"
+                    >${localize('editor.air_quality_humidity_warning_min')}</label
+                  >
+                  <input
+                    type="number"
+                    id="air-quality-humidity-warning-min"
+                    min="0"
+                    max="100"
+                    .value=${String(airQualityHumidityWarningMin)}
+                    style="width: 70px;"
+                    @change=${(e: Event) =>
+                      this._airQualityThresholdChanged('air_quality_humidity_warning_min', 35, 0, 100, e)}
+                  />
+                  %
+                </div>
+                <div class="form-row">
+                  <label for="air-quality-humidity-warning-max" style="min-width: 140px;"
+                    >${localize('editor.air_quality_humidity_warning_max')}</label
+                  >
+                  <input
+                    type="number"
+                    id="air-quality-humidity-warning-max"
+                    min="0"
+                    max="100"
+                    .value=${String(airQualityHumidityWarningMax)}
+                    style="width: 70px;"
+                    @change=${(e: Event) =>
+                      this._airQualityThresholdChanged('air_quality_humidity_warning_max', 60, 0, 100, e)}
+                  />
+                  %
+                </div>
+                <div class="form-row">
+                  <label for="air-quality-humidity-critical-min" style="min-width: 140px;"
+                    >${localize('editor.air_quality_humidity_critical_min')}</label
+                  >
+                  <input
+                    type="number"
+                    id="air-quality-humidity-critical-min"
+                    min="0"
+                    max="100"
+                    .value=${String(airQualityHumidityCriticalMin)}
+                    style="width: 70px;"
+                    @change=${(e: Event) =>
+                      this._airQualityThresholdChanged('air_quality_humidity_critical_min', 30, 0, 100, e)}
+                  />
+                  %
+                </div>
+                <div class="form-row">
+                  <label for="air-quality-humidity-critical-max" style="min-width: 140px;"
+                    >${localize('editor.air_quality_humidity_critical_max')}</label
+                  >
+                  <input
+                    type="number"
+                    id="air-quality-humidity-critical-max"
+                    min="0"
+                    max="100"
+                    .value=${String(airQualityHumidityCriticalMax)}
+                    style="width: 70px;"
+                    @change=${(e: Event) =>
+                      this._airQualityThresholdChanged('air_quality_humidity_critical_max', 70, 0, 100, e)}
+                  />
+                  %
+                </div>
+                <div class="form-row">
+                  <label for="air-quality-temperature-warning-min" style="min-width: 140px;"
+                    >${localize('editor.air_quality_temperature_warning_min')}</label
+                  >
+                  <input
+                    type="number"
+                    id="air-quality-temperature-warning-min"
+                    min="-30"
+                    max="60"
+                    .value=${String(airQualityTemperatureWarningMin)}
+                    style="width: 70px;"
+                    @change=${(e: Event) =>
+                      this._airQualityThresholdChanged('air_quality_temperature_warning_min', 18, -30, 60, e)}
+                  />
+                  °C
+                </div>
+                <div class="form-row">
+                  <label for="air-quality-temperature-warning-max" style="min-width: 140px;"
+                    >${localize('editor.air_quality_temperature_warning_max')}</label
+                  >
+                  <input
+                    type="number"
+                    id="air-quality-temperature-warning-max"
+                    min="-30"
+                    max="60"
+                    .value=${String(airQualityTemperatureWarningMax)}
+                    style="width: 70px;"
+                    @change=${(e: Event) =>
+                      this._airQualityThresholdChanged('air_quality_temperature_warning_max', 27, -30, 60, e)}
+                  />
+                  °C
+                </div>
+                <div class="form-row">
+                  <label for="air-quality-temperature-critical-min" style="min-width: 140px;"
+                    >${localize('editor.air_quality_temperature_critical_min')}</label
+                  >
+                  <input
+                    type="number"
+                    id="air-quality-temperature-critical-min"
+                    min="-30"
+                    max="60"
+                    .value=${String(airQualityTemperatureCriticalMin)}
+                    style="width: 70px;"
+                    @change=${(e: Event) =>
+                      this._airQualityThresholdChanged('air_quality_temperature_critical_min', 16, -30, 60, e)}
+                  />
+                  °C
+                </div>
+                <div class="form-row">
+                  <label for="air-quality-temperature-critical-max" style="min-width: 140px;"
+                    >${localize('editor.air_quality_temperature_critical_max')}</label
+                  >
+                  <input
+                    type="number"
+                    id="air-quality-temperature-critical-max"
+                    min="-30"
+                    max="60"
+                    .value=${String(airQualityTemperatureCriticalMax)}
+                    style="width: 70px;"
+                    @change=${(e: Event) =>
+                      this._airQualityThresholdChanged('air_quality_temperature_critical_max', 30, -30, 60, e)}
+                  />
+                  °C
+                </div>
+                <div class="description">${localize('editor.air_quality_thresholds_desc')}</div>
 
+                <div
+                  style="font-size: 13px; font-weight: 500; color: var(--primary-text-color); margin-top: 12px; margin-bottom: 4px;"
+                >
+                  ${localize('editor.air_quality_entities')}
+                </div>
+
+                <div class="form-row" style="align-items: center;">
+                  <label for="air-quality-co2-entity" style="min-width: 140px;"
+                    >${localize('editor.air_quality_co2_entities')}</label
+                  >
+                  <select id="air-quality-co2-entity" style="flex: 1;">
+                    <option value="">${localize('editor.select_entity')}</option>
+                    ${availableAirQualityCo2.map(
+                      (entry) => html`<option value=${entry.entity_id}>${entry.name} (${entry.entity_id})</option>`
+                    )}
+                  </select>
+                  <button @click=${() => this._addAirQualityEntityFromSelect('co2', 'air-quality-co2-entity')}>
+                    ${localize('editor.badges_add')}
+                  </button>
+                </div>
+                <div class="description">
+                  ${selectedAirQualityCo2.length === 0
+                    ? localize('editor.air_quality_entities_none')
+                    : selectedAirQualityCo2.map(
+                        (entityId) => html`
+                          <span
+                            style="display: inline-flex; align-items: center; margin-right: 6px; margin-bottom: 4px;"
+                          >
+                            ${entityId}
+                            <button
+                              class="badge-remove-btn"
+                              style="margin-left: 4px;"
+                              @click=${() => {
+                                this._removeAirQualityEntity('co2', entityId);
+                              }}
+                            >
+                              &#x2715;
+                            </button>
+                          </span>
+                        `
+                      )}
+                </div>
+
+                <div class="form-row" style="align-items: center; margin-top: 6px;">
+                  <label for="air-quality-humidity-entity" style="min-width: 140px;"
+                    >${localize('editor.air_quality_humidity_entities')}</label
+                  >
+                  <select id="air-quality-humidity-entity" style="flex: 1;">
+                    <option value="">${localize('editor.select_entity')}</option>
+                    ${availableAirQualityHumidity.map(
+                      (entry) => html`<option value=${entry.entity_id}>${entry.name} (${entry.entity_id})</option>`
+                    )}
+                  </select>
+                  <button
+                    @click=${() => this._addAirQualityEntityFromSelect('humidity', 'air-quality-humidity-entity')}
+                  >
+                    ${localize('editor.badges_add')}
+                  </button>
+                </div>
+                <div class="description">
+                  ${selectedAirQualityHumidity.length === 0
+                    ? localize('editor.air_quality_entities_none')
+                    : selectedAirQualityHumidity.map(
+                        (entityId) => html`
+                          <span
+                            style="display: inline-flex; align-items: center; margin-right: 6px; margin-bottom: 4px;"
+                          >
+                            ${entityId}
+                            <button
+                              class="badge-remove-btn"
+                              style="margin-left: 4px;"
+                              @click=${() => {
+                                this._removeAirQualityEntity('humidity', entityId);
+                              }}
+                            >
+                              &#x2715;
+                            </button>
+                          </span>
+                        `
+                      )}
+                </div>
+
+                <div class="form-row" style="align-items: center; margin-top: 6px;">
+                  <label for="air-quality-temperature-entity" style="min-width: 140px;"
+                    >${localize('editor.air_quality_temperature_entities')}</label
+                  >
+                  <select id="air-quality-temperature-entity" style="flex: 1;">
+                    <option value="">${localize('editor.select_entity')}</option>
+                    ${availableAirQualityTemperature.map(
+                      (entry) => html`<option value=${entry.entity_id}>${entry.name} (${entry.entity_id})</option>`
+                    )}
+                  </select>
+                  <button
+                    @click=${() => this._addAirQualityEntityFromSelect('temperature', 'air-quality-temperature-entity')}
+                  >
+                    ${localize('editor.badges_add')}
+                  </button>
+                </div>
+                <div class="description">
+                  ${selectedAirQualityTemperature.length === 0
+                    ? localize('editor.air_quality_entities_none')
+                    : selectedAirQualityTemperature.map(
+                        (entityId) => html`
+                          <span
+                            style="display: inline-flex; align-items: center; margin-right: 6px; margin-bottom: 4px;"
+                          >
+                            ${entityId}
+                            <button
+                              class="badge-remove-btn"
+                              style="margin-left: 4px;"
+                              @click=${() => {
+                                this._removeAirQualityEntity('temperature', entityId);
+                              }}
+                            >
+                              &#x2715;
+                            </button>
+                          </span>
+                        `
+                      )}
+                </div>
+
+                ${selectedAirQualityCo2.length +
+                  selectedAirQualityHumidity.length +
+                  selectedAirQualityTemperature.length >
+                0
+                  ? html`
+                      <div class="form-row" style="align-items: center; margin-top: 8px;">
+                        <button @click=${() => this._clearAirQualityEntities()}>
+                          ${localize('editor.air_quality_entities_clear')}
+                        </button>
+                      </div>
+                    `
+                  : nothing}
+              </div>
+            `
+          : nothing}
         ${this._renderCheckbox(
           'show-battery-summary',
           localize('editor.show_battery_summary'),
@@ -2714,6 +2899,62 @@ class Simon42DashboardStrategyEditor extends LitElement {
       delete (newConfig as Record<string, unknown>)[key];
     }
 
+    this._config = newConfig;
+    this._fireConfigChanged(newConfig);
+  }
+
+  private _setAirQualityEntities(metric: AirQualityConfigMetric, entityIds: string[]): void {
+    const sanitized = entityIds
+      .map((entityId) => this._sanitizeEntityId(entityId))
+      .filter((entityId): entityId is string => Boolean(entityId));
+
+    const unique = Array.from(new Set(sanitized));
+    const current = this._config.air_quality_entities || {};
+    const nextEntities = {
+      ...current,
+      [metric]: unique.length > 0 ? unique : undefined,
+    };
+
+    if (!nextEntities.co2?.length) delete nextEntities.co2;
+    if (!nextEntities.humidity?.length) delete nextEntities.humidity;
+    if (!nextEntities.temperature?.length) delete nextEntities.temperature;
+
+    const newConfig: Simon42StrategyConfig = { ...this._config };
+    if (Object.keys(nextEntities).length === 0) {
+      delete newConfig.air_quality_entities;
+    } else {
+      newConfig.air_quality_entities = nextEntities;
+    }
+
+    this._config = newConfig;
+    this._fireConfigChanged(newConfig);
+  }
+
+  private _addAirQualityEntityFromSelect(metric: AirQualityConfigMetric, selectId: string): void {
+    const select = this.shadowRoot?.querySelector(`#${selectId}`) as HTMLSelectElement | null;
+    if (!select || !select.value) return;
+
+    const entityId = this._sanitizeEntityId(select.value);
+    if (!entityId) return;
+
+    const current = this._getAirQualityEntitiesForMetric(metric);
+    if (current.includes(entityId)) return;
+
+    this._setAirQualityEntities(metric, [...current, entityId]);
+    select.value = '';
+  }
+
+  private _removeAirQualityEntity(metric: AirQualityConfigMetric, entityId: string): void {
+    const current = this._getAirQualityEntitiesForMetric(metric);
+    this._setAirQualityEntities(
+      metric,
+      current.filter((id) => id !== entityId)
+    );
+  }
+
+  private _clearAirQualityEntities(): void {
+    const newConfig: Simon42StrategyConfig = { ...this._config };
+    delete newConfig.air_quality_entities;
     this._config = newConfig;
     this._fireConfigChanged(newConfig);
   }
