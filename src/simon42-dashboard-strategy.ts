@@ -30,10 +30,14 @@ const modulesPromise = Promise.all([
   import('./views/SecurityViewStrategy'),
   import('./views/BatteriesViewStrategy'),
   import('./views/ClimateViewStrategy'),
+  import('./views/CamerasViewStrategy'),
+  import('./views/AirQualityViewStrategy'),
   import('./views/RoomViewStrategy'),
 ]);
 
-void modulesPromise.then(() => { t('all chunks loaded'); });
+void modulesPromise.then(() => {
+  t('all chunks loaded');
+});
 
 class Simon42DashboardStrategy extends HTMLElement {
   static async generate(config: Simon42StrategyConfig, hass: HomeAssistant): Promise<LovelaceConfig> {
@@ -62,6 +66,8 @@ class Simon42DashboardStrategy extends HTMLElement {
     const showSecurity = config.show_security_summary !== false;
     const showBatteries = config.show_battery_summary !== false;
     const showClimate = config.show_climate_summary === true;
+    const showCameras = config.show_camera_summary === true;
+    const showAirQuality = config.show_air_quality_summary === true;
 
     // Pre-resolve ALL views upfront (like HA's Home Panel does)
     const overviewConfig = await getStrategy('ll-strategy-simon42-view-overview').generate(
@@ -72,17 +78,59 @@ class Simon42DashboardStrategy extends HTMLElement {
 
     // Only resolve utility views for enabled summaries
     const utilityViewDefs = [
-      { enabled: showLights, title: localize('views.lights'), path: 'lights', icon: 'mdi:lamps',
-        resolve: () => getStrategy('ll-strategy-simon42-view-lights').generate({ config }, hass) },
-      { enabled: showCovers, title: localize('views.covers'), path: 'covers', icon: 'mdi:blinds-horizontal',
-        resolve: () => getStrategy('ll-strategy-simon42-view-covers').generate(
-          { device_classes: ['awning', 'blind', 'curtain', 'shade', 'shutter', 'window'], config }, hass) },
-      { enabled: showSecurity, title: localize('views.security'), path: 'security', icon: 'mdi:security',
-        resolve: () => getStrategy('ll-strategy-simon42-view-security').generate({ config }, hass) },
-      { enabled: showBatteries, title: localize('views.batteries'), path: 'batteries', icon: 'mdi:battery-alert',
-        resolve: () => getStrategy('ll-strategy-simon42-view-batteries').generate({ config }, hass) },
-      { enabled: showClimate, title: localize('views.climate'), path: 'climate', icon: 'mdi:thermostat',
-        resolve: () => getStrategy('ll-strategy-simon42-view-climate').generate({ config }, hass) },
+      {
+        enabled: showLights,
+        title: localize('views.lights'),
+        path: 'lights',
+        icon: 'mdi:lamps',
+        resolve: () => getStrategy('ll-strategy-simon42-view-lights').generate({ config }, hass),
+      },
+      {
+        enabled: showCovers,
+        title: localize('views.covers'),
+        path: 'covers',
+        icon: 'mdi:blinds-horizontal',
+        resolve: () =>
+          getStrategy('ll-strategy-simon42-view-covers').generate(
+            { device_classes: ['awning', 'blind', 'curtain', 'shade', 'shutter', 'window'], config },
+            hass
+          ),
+      },
+      {
+        enabled: showSecurity,
+        title: localize('views.security'),
+        path: 'security',
+        icon: 'mdi:security',
+        resolve: () => getStrategy('ll-strategy-simon42-view-security').generate({ config }, hass),
+      },
+      {
+        enabled: showBatteries,
+        title: localize('views.batteries'),
+        path: 'batteries',
+        icon: 'mdi:battery-alert',
+        resolve: () => getStrategy('ll-strategy-simon42-view-batteries').generate({ config }, hass),
+      },
+      {
+        enabled: showClimate,
+        title: localize('views.climate'),
+        path: 'climate',
+        icon: 'mdi:thermostat',
+        resolve: () => getStrategy('ll-strategy-simon42-view-climate').generate({ config }, hass),
+      },
+      {
+        enabled: showCameras,
+        title: localize('views.cameras'),
+        path: 'cameras',
+        icon: 'mdi:cctv',
+        resolve: () => getStrategy('ll-strategy-simon42-view-cameras').generate({ config }, hass),
+      },
+      {
+        enabled: showAirQuality,
+        title: localize('views.air_quality'),
+        path: 'air-quality',
+        icon: 'mdi:air-filter',
+        resolve: () => getStrategy('ll-strategy-simon42-view-air-quality').generate({ config }, hass),
+      },
     ];
 
     const enabledDefs = utilityViewDefs.filter((d) => d.enabled);

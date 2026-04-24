@@ -7,7 +7,13 @@ import type { HomeAssistant, HassEntity } from '../types/homeassistant';
 import { Registry } from '../Registry';
 import { trackHassUpdate, debugLog, timeStart, timeEnd } from '../utils/debug';
 import { localize } from '../utils/localize';
-import { getBatteryEntities, SECURITY_EXCLUDED_PLATFORMS } from '../utils/entity-filter';
+import {
+  getBatteryEntities,
+  getAirQualityEntities,
+  getAirQualityEntityInfo,
+  SECURITY_EXCLUDED_PLATFORMS,
+  type AirQualityStatus,
+} from '../utils/entity-filter';
 
 declare global {
   interface Window {
@@ -15,13 +21,25 @@ declare global {
   }
 }
 
-type SummaryType = 'lights' | 'covers' | 'security' | 'batteries' | 'climate';
+type SummaryType = 'lights' | 'covers' | 'security' | 'batteries' | 'climate' | 'air_quality';
 
 interface SummaryCardConfig {
   summary_type: SummaryType;
   hide_mobile_app_batteries?: boolean;
   battery_critical_threshold?: number;
+  air_quality_co2_warning_threshold?: number;
+  air_quality_co2_critical_threshold?: number;
+  air_quality_humidity_warning_min?: number;
+  air_quality_humidity_warning_max?: number;
+  air_quality_humidity_critical_min?: number;
+  air_quality_humidity_critical_max?: number;
+  air_quality_temperature_warning_min?: number;
+  air_quality_temperature_warning_max?: number;
+  air_quality_temperature_critical_min?: number;
+  air_quality_temperature_critical_max?: number;
 }
+
+type AirQualitySummaryStatus = AirQualityStatus;
 
 interface DisplayConfig {
   icon: string;
@@ -185,6 +203,10 @@ class Simon42SummaryCard extends LitElement {
         );
         break;
 
+      case 'air_quality':
+        result = getAirQualityEntities(hass, this._config).map((item) => item.entityId);
+        break;
+
       default:
         result = [];
     }
@@ -252,6 +274,18 @@ class Simon42SummaryCard extends LitElement {
         }
         return count;
 
+      case 'air_quality': {
+        const status = this._getAirQualitySummaryStatus();
+        if (status === 'ok') return 0;
+
+        for (const id of this._relevantEntityIds) {
+          const info = getAirQualityEntityInfo(id, hass, this._config);
+          if (info?.status === status) count++;
+        }
+
+        return count;
+      }
+
       default:
         return 0;
     }
@@ -260,6 +294,7 @@ class Simon42SummaryCard extends LitElement {
   private _getDisplayConfig(): DisplayConfig {
     const count = this._count;
     const hasItems = count > 0;
+    const airQualitySummaryStatus = this._getAirQualitySummaryStatus();
 
     const configs: Record<SummaryType, DisplayConfig> = {
       lights: {
@@ -300,9 +335,43 @@ class Simon42SummaryCard extends LitElement {
         color: hasItems ? 'orange' : 'grey',
         path: 'climate',
       },
+      air_quality: {
+        icon: hasItems
+          ? airQualitySummaryStatus === 'critical'
+            ? 'mdi:air-filter-alert'
+            : 'mdi:air-filter'
+          : 'mdi:air-filter',
+        name: hasItems
+          ? `${count} ${
+              count === 1
+                ? localize(`summary.air_quality_${airQualitySummaryStatus}_one`)
+                : localize(`summary.air_quality_${airQualitySummaryStatus}_many`)
+            }`
+          : localize('summary.air_quality_ok'),
+        color: hasItems ? (airQualitySummaryStatus === 'critical' ? 'red' : 'yellow') : 'grey',
+        path: 'air-quality',
+      },
     };
 
     return configs[this._config.summary_type];
+  }
+
+  private _getAirQualitySummaryStatus(): AirQualitySummaryStatus {
+    if (!this.hass) return 'ok';
+
+    this._getRelevantEntities();
+    if (!this._relevantEntityIds || this._relevantEntityIds.size === 0) return 'ok';
+
+    let hasWarning = false;
+
+    for (const id of this._relevantEntityIds) {
+      const info = getAirQualityEntityInfo(id, this.hass, this._config);
+      if (!info) continue;
+      if (info.status === 'critical') return 'critical';
+      if (info.status === 'warning') hasWarning = true;
+    }
+
+    return hasWarning ? 'warning' : 'ok';
   }
 
   private _handleClick(): void {

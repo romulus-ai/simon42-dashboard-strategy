@@ -10,13 +10,7 @@
 
 export type SectionKey = 'overview' | 'custom_cards' | 'areas' | 'weather' | 'energy';
 
-export const DEFAULT_SECTIONS_ORDER: SectionKey[] = [
-  'overview',
-  'custom_cards',
-  'areas',
-  'weather',
-  'energy',
-];
+export const DEFAULT_SECTIONS_ORDER: SectionKey[] = ['overview', 'custom_cards', 'areas', 'weather', 'energy'];
 
 // -- Main Strategy Config ---------------------------------------------
 
@@ -37,9 +31,21 @@ export interface Simon42StrategyConfig {
   show_security_summary?: boolean; // default: true
   show_battery_summary?: boolean; // default: true
   show_climate_summary?: boolean; // default: false
+  show_camera_summary?: boolean; // default: false
+  show_air_quality_summary?: boolean; // default: false
   hide_mobile_app_batteries?: boolean; // default: false
   battery_critical_threshold?: number; // default: 20
   battery_low_threshold?: number; // default: 50
+  air_quality_co2_warning_threshold?: number; // default: 1000
+  air_quality_co2_critical_threshold?: number; // default: 1500
+  air_quality_humidity_warning_min?: number; // default: 35
+  air_quality_humidity_warning_max?: number; // default: 60
+  air_quality_humidity_critical_min?: number; // default: 30
+  air_quality_humidity_critical_max?: number; // default: 70
+  air_quality_temperature_warning_min?: number; // default: 18
+  air_quality_temperature_warning_max?: number; // default: 27
+  air_quality_temperature_critical_min?: number; // default: 16
+  air_quality_temperature_critical_max?: number; // default: 30
   show_locks_in_rooms?: boolean; // default: false
   show_automations_in_rooms?: boolean; // default: false
   show_scripts_in_rooms?: boolean; // default: false
@@ -195,7 +201,7 @@ export interface PersonData {
 
 // -- Summary Types (used by summary cards) ----------------------------
 
-export type SummaryType = 'lights' | 'covers' | 'security' | 'batteries' | 'climate';
+export type SummaryType = 'lights' | 'covers' | 'security' | 'batteries' | 'climate' | 'air_quality';
 
 // -- Resolved Area (internal, enriched area for rendering) ------------
 
