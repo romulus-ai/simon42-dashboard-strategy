@@ -2317,7 +2317,7 @@ class Simon42DashboardStrategyEditor extends LitElement {
       { key: 'locks', label: localize('editor.domain_locks'), icon: 'mdi:lock' },
     ];
 
-    const hasEntities = domainGroups.some((group) => groupedEntities[group.key].length > 0);
+    const hasEntities = domainGroups.some((group) => (groupedEntities[group.key]?.length ?? 0));
     const hasBadges = badgeCandidates.length > 0 || additionalBadges.length > 0;
     const hasSoilMoistureOptions =
       groupedEntities.soil_moisture.length > 0 ||
@@ -2368,7 +2368,7 @@ class Simon42DashboardStrategyEditor extends LitElement {
 
                 if (groupCount === 0 && soilMoistureAvailable.length === 0) return nothing;
 
-                const hiddenInGroup = hiddenEntities[group.key] as string[];
+                const hiddenInGroup = (hiddenEntities[group.key] || []) as string[];
                 const allHidden = entities.length > 0 && entities.every((e) => hiddenInGroup.includes(e));
                 const someHidden = entities.some((e) => hiddenInGroup.includes(e)) && !allHidden;
                 const isGroupExpanded = expandedGroups.has(group.key);
@@ -2522,7 +2522,7 @@ class Simon42DashboardStrategyEditor extends LitElement {
     const totalCount = badgeCandidates.length + additionalBadges.length;
     if (totalCount === 0) return html``;
 
-    const hiddenInBadges = hiddenEntities.badges;
+    const hiddenInBadges =  (hiddenEntities['badges'] || [])
     const allHidden = badgeCandidates.length > 0 && badgeCandidates.every((e) => hiddenInBadges.includes(e));
     const someHidden = badgeCandidates.some((e) => hiddenInBadges.includes(e)) && !allHidden;
 
