@@ -96,6 +96,7 @@ export function createOverviewSection(data: OverviewSectionParams): LovelaceSect
   const showBatterySummary = config.show_battery_summary !== false;
   const showValvesSummary = config.show_valves_summary === true;
   const showClimateSummary = config.show_climate_summary === true;
+  const showAirQualitySummary = config.show_air_quality_summary === true;
 
   // Build summary cards based on config
   const summaryCards: LovelaceCardConfig[] = [];
@@ -148,6 +149,24 @@ export function createOverviewSection(data: OverviewSectionParams): LovelaceSect
       type: 'custom:simon42-summary-card',
       summary_type: 'climate',
       areas_options: config.areas_options || {},
+    });
+  }
+
+  if (showAirQualitySummary) {
+    summaryCards.push({
+      type: 'custom:simon42-summary-card',
+      summary_type: 'air_quality',
+      areas_options: config.areas_options || {},
+      air_quality_co2_warning_threshold: config.air_quality_co2_warning_threshold,
+      air_quality_co2_critical_threshold: config.air_quality_co2_critical_threshold,
+      air_quality_humidity_warning_min: config.air_quality_humidity_warning_min,
+      air_quality_humidity_warning_max: config.air_quality_humidity_warning_max,
+      air_quality_humidity_critical_min: config.air_quality_humidity_critical_min,
+      air_quality_humidity_critical_max: config.air_quality_humidity_critical_max,
+      air_quality_temperature_warning_min: config.air_quality_temperature_warning_min,
+      air_quality_temperature_warning_max: config.air_quality_temperature_warning_max,
+      air_quality_temperature_critical_min: config.air_quality_temperature_critical_min,
+      air_quality_temperature_critical_max: config.air_quality_temperature_critical_max,
     });
   }
 

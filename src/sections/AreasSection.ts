@@ -15,8 +15,6 @@ import { localize } from '../utils/localize';
 // Area control domains to check (same as HA, with optional 'switch')
 const CONTROL_DOMAINS = [
   'light',
-  'fan',
-  'switch',
   'cover-shutter',
   'cover-blind',
   'cover-curtain',
@@ -27,6 +25,8 @@ const CONTROL_DOMAINS = [
   'cover-door',
   'cover-window',
   'cover-damper',
+  'fan',
+  'switch',
 ] as const;
 
 type ControlDomain = (typeof CONTROL_DOMAINS)[number];
@@ -58,15 +58,23 @@ function getAreaControls(areaId: string, hass: HomeAssistant): ControlDomain[] {
     }
   }
 
-  return [...found];
+  return CONTROL_DOMAINS.filter((control) => found.has(control));
 }
 
 // Alert-relevant binary sensor device classes.
 // Excludes noisy classes like light, connectivity, battery, plug, power, running, problem.
 const ALERT_DEVICE_CLASSES = new Set([
-  'motion', 'occupancy', 'sound',
+  'motion',
+  'occupancy',
+  'sound',
   'moisture',
-  'smoke', 'gas', 'heat', 'cold', 'safety', 'tamper', 'vibration',
+  'smoke',
+  'gas',
+  'heat',
+  'cold',
+  'safety',
+  'tamper',
+  'vibration',
 ]);
 
 /**
@@ -110,9 +118,7 @@ function buildAreaCard(area: AreaRegistryEntry, hass: HomeAssistant): LovelaceCa
   }
 
   // Pre-filter alert classes if enabled
-  const alertClasses = Registry.config.show_alerts_on_areas
-    ? getAreaAlertClasses(area.area_id, hass)
-    : undefined;
+  const alertClasses = Registry.config.show_alerts_on_areas ? getAreaAlertClasses(area.area_id, hass) : undefined;
 
   return {
     type: 'area',

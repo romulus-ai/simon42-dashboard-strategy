@@ -10,7 +10,7 @@ import type { HomeAssistant } from './types/homeassistant';
 import type { Simon42StrategyConfig } from './types/strategy';
 import type { LovelaceConfig, LovelaceViewConfig } from './types/lovelace';
 
-const STRATEGY_VERSION = '1.3.5-beta.12';
+const STRATEGY_VERSION = '1.3.5-beta.13';
 
 const DEBUG = new URLSearchParams(window.location.search).has('s42_debug');
 const T0 = performance.now();
@@ -31,6 +31,8 @@ const modulesPromise = Promise.all([
   import('./views/BatteriesViewStrategy'),
   import('./views/ValvesViewStrategy'),
   import('./views/ClimateViewStrategy'),
+  import('./views/CamerasViewStrategy'),
+  import('./views/AirQualityViewStrategy'),
   import('./views/RoomViewStrategy'),
 ]);
 
@@ -66,6 +68,8 @@ class Simon42DashboardStrategy extends HTMLElement {
     const showBatteries = config.show_battery_summary !== false;
     const showValves = config.show_valves_summary === true;
     const showClimate = config.show_climate_summary === true;
+    const showCameras = config.show_camera_summary === true;
+    const showAirQuality = config.show_air_quality_summary === true;
 
     // Pre-resolve ALL views upfront (like HA's Home Panel does)
     const overviewConfig = await getStrategy('ll-strategy-simon42-view-overview').generate(
@@ -121,6 +125,20 @@ class Simon42DashboardStrategy extends HTMLElement {
         path: 'climate',
         icon: 'mdi:thermostat',
         resolve: () => getStrategy('ll-strategy-simon42-view-climate').generate({ config }, hass),
+      },
+      {
+        enabled: showCameras,
+        title: localize('views.cameras'),
+        path: 'cameras',
+        icon: 'mdi:cctv',
+        resolve: () => getStrategy('ll-strategy-simon42-view-cameras').generate({ config }, hass),
+      },
+      {
+        enabled: showAirQuality,
+        title: localize('views.air_quality'),
+        path: 'air-quality',
+        icon: 'mdi:air-filter',
+        resolve: () => getStrategy('ll-strategy-simon42-view-air-quality').generate({ config }, hass),
       },
     ];
 

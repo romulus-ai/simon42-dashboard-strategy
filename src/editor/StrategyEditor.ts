@@ -1366,11 +1366,23 @@ class Simon42DashboardStrategyEditor extends LitElement {
     const showSecuritySummary = this._config.show_security_summary !== false;
     const showValvesSummary = this._config.show_valves_summary === true;
     const showClimateSummary = this._config.show_climate_summary === true;
+    const showCameraSummary = this._config.show_camera_summary === true;
+    const showAirQualitySummary = this._config.show_air_quality_summary === true;
     const showBatterySummary = this._config.show_battery_summary !== false;
     const hideMobileAppBatteries = this._config.hide_mobile_app_batteries === true;
     const showUnknownBatteryGroup = this._config.show_unknown_battery_group === true;
     const batteryCriticalThreshold = this._config.battery_critical_threshold ?? 20;
     const batteryLowThreshold = this._config.battery_low_threshold ?? 50;
+    const airQualityCo2Warning = this._config.air_quality_co2_warning_threshold ?? 1000;
+    const airQualityCo2Critical = this._config.air_quality_co2_critical_threshold ?? 1500;
+    const airQualityHumidityWarningMin = this._config.air_quality_humidity_warning_min ?? 35;
+    const airQualityHumidityWarningMax = this._config.air_quality_humidity_warning_max ?? 60;
+    const airQualityHumidityCriticalMin = this._config.air_quality_humidity_critical_min ?? 30;
+    const airQualityHumidityCriticalMax = this._config.air_quality_humidity_critical_max ?? 70;
+    const airQualityTemperatureWarningMin = this._config.air_quality_temperature_warning_min ?? 18;
+    const airQualityTemperatureWarningMax = this._config.air_quality_temperature_warning_max ?? 27;
+    const airQualityTemperatureCriticalMin = this._config.air_quality_temperature_critical_min ?? 16;
+    const airQualityTemperatureCriticalMax = this._config.air_quality_temperature_critical_max ?? 30;
 
     return html`
       <div class="section">
@@ -1480,12 +1492,195 @@ class Simon42DashboardStrategyEditor extends LitElement {
         <div class="description">${localize('editor.show_climate_summary_desc')}</div>
 
         ${this._renderCheckbox(
+          'show-camera-summary',
+          localize('editor.show_camera_summary'),
+          showCameraSummary,
+          (checked) => this._toggleChanged('show_camera_summary', checked, false)
+        )}
+        <div class="description">${localize('editor.show_camera_summary_desc')}</div>
+
+        ${this._renderCheckbox(
+          'show-air-quality-summary',
+          localize('editor.show_air_quality_summary'),
+          showAirQualitySummary,
+          (checked) => this._toggleChanged('show_air_quality_summary', checked, false)
+        )}
+        <div class="description">${localize('editor.show_air_quality_summary_desc')}</div>
+
+        <div style="margin-left: 26px; margin-bottom: 8px;">
+          <div
+            style="font-size: 13px; font-weight: 500; color: var(--primary-text-color); margin-top: 12px; margin-bottom: 4px;"
+          >
+            ${localize('editor.air_quality_thresholds')}
+          </div>
+          <div class="form-row">
+            <label for="air-quality-co2-warning" style="min-width: 140px;"
+              >${localize('editor.air_quality_co2_warning_above')}</label
+            >
+            <input
+              type="number"
+              id="air-quality-co2-warning"
+              min="300"
+              max="10000"
+              .value=${String(airQualityCo2Warning)}
+              style="width: 90px;"
+              @change=${(e: Event) =>
+                this._airQualityThresholdChanged('air_quality_co2_warning_threshold', 1000, 300, 10000, e)}
+            />
+            ppm
+          </div>
+          <div class="form-row">
+            <label for="air-quality-co2-critical" style="min-width: 140px;"
+              >${localize('editor.air_quality_co2_critical_above')}</label
+            >
+            <input
+              type="number"
+              id="air-quality-co2-critical"
+              min="300"
+              max="10000"
+              .value=${String(airQualityCo2Critical)}
+              style="width: 90px;"
+              @change=${(e: Event) =>
+                this._airQualityThresholdChanged('air_quality_co2_critical_threshold', 1500, 300, 10000, e)}
+            />
+            ppm
+          </div>
+          <div class="form-row">
+            <label for="air-quality-humidity-warning-min" style="min-width: 140px;"
+              >${localize('editor.air_quality_humidity_warning_min')}</label
+            >
+            <input
+              type="number"
+              id="air-quality-humidity-warning-min"
+              min="0"
+              max="100"
+              .value=${String(airQualityHumidityWarningMin)}
+              style="width: 70px;"
+              @change=${(e: Event) =>
+                this._airQualityThresholdChanged('air_quality_humidity_warning_min', 35, 0, 100, e)}
+            />
+            %
+          </div>
+          <div class="form-row">
+            <label for="air-quality-humidity-warning-max" style="min-width: 140px;"
+              >${localize('editor.air_quality_humidity_warning_max')}</label
+            >
+            <input
+              type="number"
+              id="air-quality-humidity-warning-max"
+              min="0"
+              max="100"
+              .value=${String(airQualityHumidityWarningMax)}
+              style="width: 70px;"
+              @change=${(e: Event) =>
+                this._airQualityThresholdChanged('air_quality_humidity_warning_max', 60, 0, 100, e)}
+            />
+            %
+          </div>
+          <div class="form-row">
+            <label for="air-quality-humidity-critical-min" style="min-width: 140px;"
+              >${localize('editor.air_quality_humidity_critical_min')}</label
+            >
+            <input
+              type="number"
+              id="air-quality-humidity-critical-min"
+              min="0"
+              max="100"
+              .value=${String(airQualityHumidityCriticalMin)}
+              style="width: 70px;"
+              @change=${(e: Event) =>
+                this._airQualityThresholdChanged('air_quality_humidity_critical_min', 30, 0, 100, e)}
+            />
+            %
+          </div>
+          <div class="form-row">
+            <label for="air-quality-humidity-critical-max" style="min-width: 140px;"
+              >${localize('editor.air_quality_humidity_critical_max')}</label
+            >
+            <input
+              type="number"
+              id="air-quality-humidity-critical-max"
+              min="0"
+              max="100"
+              .value=${String(airQualityHumidityCriticalMax)}
+              style="width: 70px;"
+              @change=${(e: Event) =>
+                this._airQualityThresholdChanged('air_quality_humidity_critical_max', 70, 0, 100, e)}
+            />
+            %
+          </div>
+          <div class="form-row">
+            <label for="air-quality-temperature-warning-min" style="min-width: 140px;"
+              >${localize('editor.air_quality_temperature_warning_min')}</label
+            >
+            <input
+              type="number"
+              id="air-quality-temperature-warning-min"
+              min="-30"
+              max="60"
+              .value=${String(airQualityTemperatureWarningMin)}
+              style="width: 70px;"
+              @change=${(e: Event) =>
+                this._airQualityThresholdChanged('air_quality_temperature_warning_min', 18, -30, 60, e)}
+            />
+            °C
+          </div>
+          <div class="form-row">
+            <label for="air-quality-temperature-warning-max" style="min-width: 140px;"
+              >${localize('editor.air_quality_temperature_warning_max')}</label
+            >
+            <input
+              type="number"
+              id="air-quality-temperature-warning-max"
+              min="-30"
+              max="60"
+              .value=${String(airQualityTemperatureWarningMax)}
+              style="width: 70px;"
+              @change=${(e: Event) =>
+                this._airQualityThresholdChanged('air_quality_temperature_warning_max', 27, -30, 60, e)}
+            />
+            °C
+          </div>
+          <div class="form-row">
+            <label for="air-quality-temperature-critical-min" style="min-width: 140px;"
+              >${localize('editor.air_quality_temperature_critical_min')}</label
+            >
+            <input
+              type="number"
+              id="air-quality-temperature-critical-min"
+              min="-30"
+              max="60"
+              .value=${String(airQualityTemperatureCriticalMin)}
+              style="width: 70px;"
+              @change=${(e: Event) =>
+                this._airQualityThresholdChanged('air_quality_temperature_critical_min', 16, -30, 60, e)}
+            />
+            °C
+          </div>
+          <div class="form-row">
+            <label for="air-quality-temperature-critical-max" style="min-width: 140px;"
+              >${localize('editor.air_quality_temperature_critical_max')}</label
+            >
+            <input
+              type="number"
+              id="air-quality-temperature-critical-max"
+              min="-30"
+              max="60"
+              .value=${String(airQualityTemperatureCriticalMax)}
+              style="width: 70px;"
+              @change=${(e: Event) =>
+                this._airQualityThresholdChanged('air_quality_temperature_critical_max', 30, -30, 60, e)}
+            />
+            °C
+          </div>
+          <div class="description">${localize('editor.air_quality_thresholds_desc')}</div>
+        </div>
+
+        ${this._renderCheckbox(
           'show-battery-summary',
           localize('editor.show_battery_summary'),
           showBatterySummary,
-          (checked) => {
-            this._toggleChanged('show_battery_summary', checked, true);
-          }
+          (checked) => this._toggleChanged('show_battery_summary', checked, true)
         )}
 
         <div style="margin-left: 26px; margin-bottom: 8px;">
@@ -2863,6 +3058,39 @@ class Simon42DashboardStrategyEditor extends LitElement {
     if (isNaN(value) || value < 1 || value > 99) return;
     const newConfig: Simon42StrategyConfig = { ...this._config, battery_low_threshold: value };
     if (value === 50) delete newConfig.battery_low_threshold;
+    this._config = newConfig;
+    this._fireConfigChanged(newConfig);
+  }
+
+  private _airQualityThresholdChanged(
+    key:
+      | 'air_quality_co2_warning_threshold'
+      | 'air_quality_co2_critical_threshold'
+      | 'air_quality_humidity_warning_min'
+      | 'air_quality_humidity_warning_max'
+      | 'air_quality_humidity_critical_min'
+      | 'air_quality_humidity_critical_max'
+      | 'air_quality_temperature_warning_min'
+      | 'air_quality_temperature_warning_max'
+      | 'air_quality_temperature_critical_min'
+      | 'air_quality_temperature_critical_max',
+    defaultValue: number,
+    min: number,
+    max: number,
+    e: Event
+  ): void {
+    const value = parseFloat((e.target as HTMLInputElement).value);
+    if (isNaN(value) || value < min || value > max) return;
+
+    const newConfig: Simon42StrategyConfig = {
+      ...this._config,
+      [key]: value,
+    };
+
+    if (value === defaultValue) {
+      delete (newConfig as Record<string, unknown>)[key];
+    }
+
     this._config = newConfig;
     this._fireConfigChanged(newConfig);
   }
