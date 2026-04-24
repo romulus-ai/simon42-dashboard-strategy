@@ -30,6 +30,8 @@ export interface Simon42StrategyConfig {
   nested_light_groups?: boolean; // default: false
   show_security_summary?: boolean; // default: true
   show_battery_summary?: boolean; // default: true
+  show_unknown_battery_group?: boolean; // default: false
+  show_valves_summary?: boolean; // default: false
   show_climate_summary?: boolean; // default: false
   show_camera_summary?: boolean; // default: false
   show_air_quality_summary?: boolean; // default: false
@@ -95,6 +97,7 @@ export interface AreasDisplay {
 }
 
 export interface AreaOptions {
+  cleaning_vacuum_entity?: string;
   groups_options?: Record<string, GroupOptions>;
 }
 
@@ -162,6 +165,8 @@ export interface RoomEntities {
   media_player: string[];
   vacuum: string[];
   fan: string[];
+  valves: string[];
+  soil_moisture: string[];
   switches: string[];
   locks: string[];
   automations: string[];
@@ -201,7 +206,7 @@ export interface PersonData {
 
 // -- Summary Types (used by summary cards) ----------------------------
 
-export type SummaryType = 'lights' | 'covers' | 'security' | 'batteries' | 'climate' | 'air_quality';
+export type SummaryType = 'lights' | 'covers' | 'security' | 'batteries' | 'valves' | 'climate' | 'air_quality';
 
 // -- Resolved Area (internal, enriched area for rendering) ------------
 

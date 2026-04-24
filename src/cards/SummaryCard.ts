@@ -21,11 +21,12 @@ declare global {
   }
 }
 
-type SummaryType = 'lights' | 'covers' | 'security' | 'batteries' | 'climate' | 'air_quality';
+type SummaryType = 'lights' | 'covers' | 'security' | 'batteries' | 'valves' | 'climate' | 'air_quality';
 
 interface SummaryCardConfig {
   summary_type: SummaryType;
   hide_mobile_app_batteries?: boolean;
+  show_unknown_battery_group?: boolean;
   battery_critical_threshold?: number;
   air_quality_co2_warning_threshold?: number;
   air_quality_co2_critical_threshold?: number;
@@ -40,6 +41,7 @@ interface SummaryCardConfig {
 }
 
 type AirQualitySummaryStatus = AirQualityStatus;
+type BatterySummaryStatus = 'critical' | 'unknown' | 'good';
 
 interface DisplayConfig {
   icon: string;
@@ -58,6 +60,8 @@ const COLOR_MAP: Record<string, string> = {
   purple: 'var(--purple-color, #9c27b0)',
   yellow: 'var(--yellow-color, #ffc107)',
   red: 'var(--red-color, #f44336)',
+  blue: 'var(--blue-color, #03a9f4)',
+  white: 'var(--white-color, #eeeeee)',
   grey: 'var(--disabled-color, #bdbdbd)',
 };
 
@@ -197,14 +201,19 @@ class Simon42SummaryCard extends LitElement {
         break;
       }
 
-      case 'climate':
-        result = Registry.getVisibleEntityIdsForDomain('climate').filter(
+      case 'valves':
+        result = Registry.getVisibleEntityIdsForDomain('valve').filter(
           (id) => hass.states[id] && this._isEntityRelevant(id, hass.states[id])
         );
         break;
 
       case 'air_quality':
         result = getAirQualityEntities(hass, this._config).map((item) => item.entityId);
+      case 'climate':
+        result = [
+          ...Registry.getVisibleEntityIdsForDomain('climate'),
+          ...Registry.getVisibleEntityIdsForDomain('humidifier'),
+        ].filter((id) => hass.states[id] && this._isEntityRelevant(id, hass.states[id]));
         break;
 
       default:
@@ -250,22 +259,46 @@ class Simon42SummaryCard extends LitElement {
         return count;
 
       case 'batteries': {
+        const status = this._getBatterySummaryStatus();
+        if (status === 'good') return 0;
+
         const critThreshold = this._config.battery_critical_threshold ?? 20;
+        const showUnknownBatteryGroup = this._config.show_unknown_battery_group === true;
         for (const id of this._relevantEntityIds) {
           const state = hass.states[id];
           if (!state) continue;
+
+          const isUnavailable = state.state === 'unavailable' || state.state === 'unknown';
+
           if (id.startsWith('binary_sensor.')) {
-            if (state.state === 'on') count++;
+            if (status === 'critical' && state.state === 'on') count++;
           } else {
             const unit = state.attributes?.unit_of_measurement;
             if (unit && unit !== '%') continue;
+
+            if (status === 'unknown') {
+              if (isUnavailable) count++;
+              continue;
+            }
+
+            if (isUnavailable) {
+              if (!showUnknownBatteryGroup) count++;
+              continue;
+            }
+
             const value = parseFloat(state.state);
-            const isUnavailable = state.state === 'unavailable' || state.state === 'unknown';
-            if (isUnavailable || (!isNaN(value) && value < critThreshold)) count++;
+            if (!isNaN(value) && value < critThreshold) count++;
           }
         }
         return count;
       }
+
+      case 'valves':
+        for (const id of this._relevantEntityIds) {
+          const s = hass.states[id]?.state;
+          if (s === 'open' || s === 'opening') count++;
+        }
+        return count;
 
       case 'climate':
         for (const id of this._relevantEntityIds) {
@@ -295,6 +328,7 @@ class Simon42SummaryCard extends LitElement {
     const count = this._count;
     const hasItems = count > 0;
     const airQualitySummaryStatus = this._getAirQualitySummaryStatus();
+    const batterySummaryStatus = this._getBatterySummaryStatus();
 
     const configs: Record<SummaryType, DisplayConfig> = {
       lights: {
@@ -320,12 +354,28 @@ class Simon42SummaryCard extends LitElement {
         path: 'security',
       },
       batteries: {
-        icon: hasItems ? 'mdi:battery-alert' : 'mdi:battery-charging',
+        icon: hasItems
+          ? batterySummaryStatus === 'unknown'
+            ? 'mdi:battery-unknown'
+            : 'mdi:battery-alert'
+          : 'mdi:battery-charging',
         name: hasItems
-          ? `${count} ${count === 1 ? localize('summary.batteries_critical_one') : localize('summary.batteries_critical_many')}`
+          ? `${count} ${
+              count === 1
+                ? localize(`summary.batteries_${batterySummaryStatus}_one`)
+                : localize(`summary.batteries_${batterySummaryStatus}_many`)
+            }`
           : localize('summary.batteries_ok'),
-        color: hasItems ? 'red' : 'grey',
+        color: hasItems ? (batterySummaryStatus === 'unknown' ? 'cyan' : 'red') : 'grey',
         path: 'batteries',
+      },
+      valves: {
+        icon: 'mdi:valve',
+        name: hasItems
+          ? `${count} ${count === 1 ? localize('summary.valves_open_one') : localize('summary.valves_open_many')}`
+          : localize('summary.valves_closed'),
+        color: hasItems ? 'blue' : 'grey',
+        path: 'valves',
       },
       climate: {
         icon: 'mdi:thermostat',
@@ -372,6 +422,50 @@ class Simon42SummaryCard extends LitElement {
     }
 
     return hasWarning ? 'warning' : 'ok';
+  }
+
+  private _getBatterySummaryStatus(): BatterySummaryStatus {
+    if (!this.hass) return 'good';
+    this._getRelevantEntities();
+    if (!this._relevantEntityIds || this._relevantEntityIds.size === 0) return 'good';
+
+    const showUnknownBatteryGroup = this._config.show_unknown_battery_group === true;
+    const criticalThreshold = this._config.battery_critical_threshold ?? 20;
+    let hasCritical = false;
+    let hasUnknown = false;
+
+    for (const id of this._relevantEntityIds) {
+      const state = this.hass.states[id];
+      if (!state) continue;
+
+      if (id.startsWith('binary_sensor.')) {
+        if (state.state === 'on') {
+          hasCritical = true;
+          break;
+        }
+        continue;
+      }
+
+      const isUnavailable = state.state === 'unavailable' || state.state === 'unknown';
+      if (isUnavailable) {
+        if (showUnknownBatteryGroup) hasUnknown = true;
+        else {
+          hasCritical = true;
+          break;
+        }
+        continue;
+      }
+
+      const value = parseFloat(state.state);
+      if (!isNaN(value) && value < criticalThreshold) {
+        hasCritical = true;
+        break;
+      }
+    }
+
+    if (hasCritical) return 'critical';
+    if (showUnknownBatteryGroup && hasUnknown) return 'unknown';
+    return 'good';
   }
 
   private _handleClick(): void {

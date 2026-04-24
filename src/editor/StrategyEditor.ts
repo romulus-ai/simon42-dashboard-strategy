@@ -17,6 +17,7 @@ import type {
   CustomBadge,
   RoomEntities,
   SectionKey,
+  AreaOptions,
 } from '../types/strategy';
 import { DEFAULT_SECTIONS_ORDER } from '../types/strategy';
 import type { AreaRegistryEntry, EntityRegistryEntry } from '../types/registries';
@@ -83,6 +84,8 @@ class Simon42DashboardStrategyEditor extends LitElement {
       badgeCandidates: string[];
       additionalBadges: string[];
       availableEntities: Array<{ entity_id: string; name: string }>;
+      additionalSoilMoisture: string[];
+      availableSoilMoistureEntities: Array<{ entity_id: string; name: string }>;
       defaultShowNames: Set<string>;
       namesVisible: string[];
       namesHidden: string[];
@@ -188,6 +191,66 @@ class Simon42DashboardStrategyEditor extends LitElement {
       return aName.localeCompare(bName);
     });
     return filtered.slice(0, 21);
+  }
+
+  private _sanitizePlainTextInput(value: string): string {
+    return value.replace(/[<>]/g, '');
+  }
+
+  private _sanitizeAreaId(value: string): string {
+    const cleanValue = this._sanitizePlainTextInput(value).trim();
+    return /^[a-z0-9_-]+$/i.test(cleanValue) ? cleanValue : '';
+  }
+
+  private _sanitizeGroupKey(value: string): string {
+    const cleanValue = this._sanitizePlainTextInput(value).trim();
+    return /^[a-z0-9_]+$/i.test(cleanValue) ? cleanValue : '';
+  }
+
+  private _sanitizeEntityId(value: string): string {
+    const cleanValue = this._sanitizePlainTextInput(value).trim();
+    return /^[a-z0-9_]+\.[a-z0-9_]+$/i.test(cleanValue) ? cleanValue : '';
+  }
+
+  private _readSelectValue(e: Event): string {
+    const target = e.target;
+    if (!(target instanceof HTMLSelectElement)) return '';
+    return this._sanitizePlainTextInput(target.value);
+  }
+
+  private _readTextFromEvent(e: Event): string {
+    const target = e.target;
+    if (
+      !(target instanceof HTMLInputElement) &&
+      !(target instanceof HTMLTextAreaElement) &&
+      !(target instanceof HTMLSelectElement)
+    ) {
+      return '';
+    }
+    return this._sanitizePlainTextInput(target.value);
+  }
+
+  private _readTextAreaValue(e: Event): string {
+    const target = e.target;
+    return target instanceof HTMLTextAreaElement ? target.value : '';
+  }
+
+  private _readCheckedFromEvent(e: Event): boolean {
+    const target = e.target;
+    return target instanceof HTMLInputElement && target.checked === true;
+  }
+
+  private _getAreaOptions(areaId: string): AreaOptions {
+    const allAreaOptions = this._config.areas_options;
+    if (!allAreaOptions) return {};
+    const areaEntry = Object.entries(allAreaOptions).find(([id]) => id === areaId);
+    if (!areaEntry) return {};
+    return areaEntry[1] as AreaOptions;
+  }
+
+  private _getSectionLabelKey(key: SectionKey): string {
+    const meta = Simon42DashboardStrategyEditor._sectionMeta.get(key);
+    return meta ? meta.labelKey : 'sections.overview';
   }
 
   // -- Styles -----------------------------------------------------------
@@ -1127,7 +1190,8 @@ class Simon42DashboardStrategyEditor extends LitElement {
                           type="checkbox"
                           ?checked=${!disabled}
                           @change=${(e: Event) => {
-                            this._toggleSectionVisibility(key, (e.target as HTMLInputElement).checked);
+                            const checked = this._readCheckedFromEvent(e);
+                            this._toggleSectionVisibility(key, checked);
                           }}
                           @dragstart=${(e: Event) => {
                             e.stopPropagation();
@@ -1145,7 +1209,8 @@ class Simon42DashboardStrategyEditor extends LitElement {
                         id="energy-link-dashboard"
                         ?checked=${energyLinkDashboard}
                         @change=${(e: Event) => {
-                          this._toggleChanged('energy_link_dashboard', (e.target as HTMLInputElement).checked, true);
+                          const checked = this._readCheckedFromEvent(e);
+                          this._toggleChanged('energy_link_dashboard', checked, true);
                         }}
                       />
                       <label for="energy-link-dashboard">${localize('editor.energy_link_dashboard')}</label>
@@ -1247,16 +1312,22 @@ class Simon42DashboardStrategyEditor extends LitElement {
       <div class="section">
         <div class="section-title">${localize('editor.section_overview')}</div>
 
-        ${this._renderCheckbox('show-clock-card', localize('editor.show_clock_card'), showClockCard, (checked) =>
-          this._toggleChanged('show_clock_card', checked, true)
-        )}
+        ${this._renderCheckbox('show-clock-card', localize('editor.show_clock_card'), showClockCard, (checked) => {
+          this._toggleChanged('show_clock_card', checked, true);
+        })}
         <div class="description">${localize('editor.show_clock_card_desc')}</div>
 
         <div class="form-row">
           <label for="alarm-entity" style="margin-right: 8px; min-width: 120px;"
             >${localize('editor.alarm_entity')}</label
           >
-          <select id="alarm-entity" style="flex: 1;" @change=${this._alarmEntityChanged}>
+          <select
+            id="alarm-entity"
+            style="flex: 1;"
+            @change=${(e: Event) => {
+              this._alarmEntityChanged(e);
+            }}
+          >
             <option value="" ?selected=${!alarmEntity}>${localize('editor.alarm_none')}</option>
             ${alarmEntities.map(
               (entity) => html`
@@ -1271,7 +1342,9 @@ class Simon42DashboardStrategyEditor extends LitElement {
           'show-search-card',
           localize('editor.show_search_card'),
           showSearchCard,
-          (checked) => this._toggleChanged('show_search_card', checked, false),
+          (checked) => {
+            this._toggleChanged('show_search_card', checked, false);
+          },
           !hasSearchCardDeps
         )}
         <div class="description">
@@ -1291,11 +1364,13 @@ class Simon42DashboardStrategyEditor extends LitElement {
     const showCoversSummary = this._config.show_covers_summary !== false;
     const showPartiallyOpenCovers = this._config.show_partially_open_covers === true;
     const showSecuritySummary = this._config.show_security_summary !== false;
+    const showValvesSummary = this._config.show_valves_summary === true;
     const showClimateSummary = this._config.show_climate_summary === true;
     const showCameraSummary = this._config.show_camera_summary === true;
     const showAirQualitySummary = this._config.show_air_quality_summary === true;
     const showBatterySummary = this._config.show_battery_summary !== false;
     const hideMobileAppBatteries = this._config.hide_mobile_app_batteries === true;
+    const showUnknownBatteryGroup = this._config.show_unknown_battery_group === true;
     const batteryCriticalThreshold = this._config.battery_critical_threshold ?? 20;
     const batteryLowThreshold = this._config.battery_low_threshold ?? 50;
     const airQualityCo2Warning = this._config.air_quality_co2_warning_threshold ?? 1000;
@@ -1320,7 +1395,9 @@ class Simon42DashboardStrategyEditor extends LitElement {
             name="summaries-columns"
             value="2"
             ?checked=${summariesColumns === 2}
-            @change=${() => this._summariesColumnsChanged(2)}
+            @change=${() => {
+              this._summariesColumnsChanged(2);
+            }}
           />
           <label for="summaries-2-columns">${localize('editor.columns_2')}</label>
         </div>
@@ -1331,7 +1408,9 @@ class Simon42DashboardStrategyEditor extends LitElement {
             name="summaries-columns"
             value="4"
             ?checked=${summariesColumns === 4}
-            @change=${() => this._summariesColumnsChanged(4)}
+            @change=${() => {
+              this._summariesColumnsChanged(4);
+            }}
           />
           <label for="summaries-4-columns">${localize('editor.columns_4')}</label>
         </div>
@@ -1341,13 +1420,17 @@ class Simon42DashboardStrategyEditor extends LitElement {
           'show-light-summary',
           localize('editor.show_light_summary'),
           showLightSummary,
-          (checked) => this._toggleChanged('show_light_summary', checked, true)
+          (checked) => {
+            this._toggleChanged('show_light_summary', checked, true);
+          }
         )}
         ${this._renderCheckbox(
           'group-lights-by-floors',
           localize('editor.group_lights_by_floors'),
           groupLightsByFloors,
-          (checked) => this._toggleChanged('group_lights_by_floors', checked, false)
+          (checked) => {
+            this._toggleChanged('group_lights_by_floors', checked, false);
+          }
         )}
         <div class="description">${localize('editor.group_lights_by_floors_desc')}</div>
 
@@ -1355,7 +1438,9 @@ class Simon42DashboardStrategyEditor extends LitElement {
           'nested-light-groups',
           localize('editor.nested_light_groups'),
           nestedLightGroups,
-          (checked) => this._toggleChanged('nested_light_groups', checked, false)
+          (checked) => {
+            this._toggleChanged('nested_light_groups', checked, false);
+          }
         )}
         <div class="description">${localize('editor.nested_light_groups_desc')}</div>
 
@@ -1363,7 +1448,9 @@ class Simon42DashboardStrategyEditor extends LitElement {
           'show-covers-summary',
           localize('editor.show_covers_summary'),
           showCoversSummary,
-          (checked) => this._toggleChanged('show_covers_summary', checked, true)
+          (checked) => {
+            this._toggleChanged('show_covers_summary', checked, true);
+          }
         )}
 
         <div style="margin-left: 26px; margin-bottom: 8px;">
@@ -1371,7 +1458,9 @@ class Simon42DashboardStrategyEditor extends LitElement {
             'show-partially-open-covers',
             localize('editor.show_partially_open_covers'),
             showPartiallyOpenCovers,
-            (checked) => this._toggleChanged('show_partially_open_covers', checked, false)
+            (checked) => {
+              this._toggleChanged('show_partially_open_covers', checked, false);
+            }
           )}
           <div class="description">${localize('editor.show_partially_open_covers_desc')}</div>
         </div>
@@ -1380,13 +1469,25 @@ class Simon42DashboardStrategyEditor extends LitElement {
           'show-security-summary',
           localize('editor.show_security_summary'),
           showSecuritySummary,
-          (checked) => this._toggleChanged('show_security_summary', checked, true)
+          (checked) => {
+            this._toggleChanged('show_security_summary', checked, true);
+          }
+        )}
+        ${this._renderCheckbox(
+          'show-valves-summary',
+          localize('editor.show_valves_summary'),
+          showValvesSummary,
+          (checked) => {
+            this._toggleChanged('show_valves_summary', checked, false);
+          }
         )}
         ${this._renderCheckbox(
           'show-climate-summary',
           localize('editor.show_climate_summary'),
           showClimateSummary,
-          (checked) => this._toggleChanged('show_climate_summary', checked, false)
+          (checked) => {
+            this._toggleChanged('show_climate_summary', checked, false);
+          }
         )}
         <div class="description">${localize('editor.show_climate_summary_desc')}</div>
 
@@ -1587,9 +1688,21 @@ class Simon42DashboardStrategyEditor extends LitElement {
             'hide-mobile-app-batteries',
             localize('editor.hide_mobile_app_batteries'),
             hideMobileAppBatteries,
-            (checked) => this._toggleChanged('hide_mobile_app_batteries', checked, false)
+            (checked) => {
+              this._toggleChanged('hide_mobile_app_batteries', checked, false);
+            }
           )}
           <div class="description">${localize('editor.hide_mobile_app_batteries_desc')}</div>
+
+          ${this._renderCheckbox(
+            'show-unknown-battery-group',
+            localize('editor.show_unknown_battery_group'),
+            showUnknownBatteryGroup,
+            (checked) => {
+              this._toggleChanged('show_unknown_battery_group', checked, false);
+            }
+          )}
+          <div class="description">${localize('editor.show_unknown_battery_group_desc')}</div>
 
           <div
             style="font-size: 13px; font-weight: 500; color: var(--primary-text-color); margin-top: 12px; margin-bottom: 4px;"
@@ -1607,7 +1720,9 @@ class Simon42DashboardStrategyEditor extends LitElement {
               max="99"
               .value=${String(batteryCriticalThreshold)}
               style="width: 70px;"
-              @change=${this._batteryCriticalChanged}
+              @change=${(e: Event) => {
+                this._batteryCriticalChanged(e);
+              }}
             />
             %
           </div>
@@ -1620,7 +1735,9 @@ class Simon42DashboardStrategyEditor extends LitElement {
               max="99"
               .value=${String(batteryLowThreshold)}
               style="width: 70px;"
-              @change=${this._batteryLowChanged}
+              @change=${(e: Event) => {
+                this._batteryLowChanged(e);
+              }}
             />
             %
           </div>
@@ -1655,18 +1772,27 @@ class Simon42DashboardStrategyEditor extends LitElement {
                         class="entity-list-item"
                         data-entity-id=${entityId}
                         draggable="true"
-                        @dragstart=${(ev: DragEvent) => this._handleEntityDragStart(ev, 'favorites')}
+                        @dragstart=${(ev: DragEvent) => {
+                          this._handleEntityDragStart(ev, 'favorites');
+                        }}
                         @dragend=${this._handleEntityDragEnd}
                         @dragover=${this._handleEntityDragOver}
                         @dragleave=${this._handleEntityDragLeave}
-                        @drop=${(ev: DragEvent) => this._handleEntityDrop(ev, 'favorites')}
+                        @drop=${(ev: DragEvent) => {
+                          this._handleEntityDrop(ev, 'favorites');
+                        }}
                       >
                         <span class="drag-icon">&#x2630;</span>
                         <span class="item-info">
                           <span class="item-name">${name}</span>
                           <span class="item-entity-id">${entityId}</span>
                         </span>
-                        <button class="btn-remove" @click=${() => this._removeFavoriteEntity(entityId)}>
+                        <button
+                          class="btn-remove"
+                          @click=${() => {
+                            this._removeFavoriteEntity(entityId);
+                          }}
+                        >
                           &#x2715;
                         </button>
                       </div>
@@ -1683,7 +1809,7 @@ class Simon42DashboardStrategyEditor extends LitElement {
             placeholder=${localize('editor.select_entity') + '...'}
             .value=${this._favoriteSearch}
             @input=${(e: Event) => {
-              this._favoriteSearch = (e.target as HTMLInputElement).value;
+              this._favoriteSearch = this._readTextFromEvent(e);
               this.requestUpdate();
             }}
             @blur=${() => {
@@ -1720,14 +1846,16 @@ class Simon42DashboardStrategyEditor extends LitElement {
         </div>
         <div class="description">${localize('editor.favorites_desc')}</div>
 
-        ${this._renderCheckbox('favorites-show-state', localize('editor.show_state'), favoritesShowState, (checked) =>
-          this._toggleChanged('favorites_show_state', checked, false)
-        )}
+        ${this._renderCheckbox('favorites-show-state', localize('editor.show_state'), favoritesShowState, (checked) => {
+          this._toggleChanged('favorites_show_state', checked, false);
+        })}
         ${this._renderCheckbox(
           'favorites-hide-last-changed',
           localize('editor.hide_last_changed'),
           favoritesHideLastChanged,
-          (checked) => this._toggleChanged('favorites_hide_last_changed', checked, false)
+          (checked) => {
+            this._toggleChanged('favorites_hide_last_changed', checked, false);
+          }
         )}
       </div>
     `;
@@ -1750,16 +1878,18 @@ class Simon42DashboardStrategyEditor extends LitElement {
       <div class="section">
         <div class="section-title">${localize('editor.section_areas')}</div>
 
-        ${this._renderCheckbox('group-by-floors', localize('editor.group_by_floors'), groupByFloors, (checked) =>
-          this._toggleChanged('group_by_floors', checked, false)
-        )}
+        ${this._renderCheckbox('group-by-floors', localize('editor.group_by_floors'), groupByFloors, (checked) => {
+          this._toggleChanged('group_by_floors', checked, false);
+        })}
         <div class="description">${localize('editor.group_by_floors_desc')}</div>
 
         ${this._renderCheckbox(
           'show-switches-on-areas',
           localize('editor.show_switches_on_areas'),
           showSwitchesOnAreas,
-          (checked) => this._toggleChanged('show_switches_on_areas', checked, false)
+          (checked) => {
+            this._toggleChanged('show_switches_on_areas', checked, false);
+          }
         )}
         <div class="description">${localize('editor.show_switches_on_areas_desc')}</div>
 
@@ -1767,7 +1897,9 @@ class Simon42DashboardStrategyEditor extends LitElement {
           'show-alerts-on-areas',
           localize('editor.show_alerts_on_areas'),
           showAlertsOnAreas,
-          (checked) => this._toggleChanged('show_alerts_on_areas', checked, false)
+          (checked) => {
+            this._toggleChanged('show_alerts_on_areas', checked, false);
+          }
         )}
         <div class="description">${localize('editor.show_alerts_on_areas_desc')}</div>
 
@@ -1775,7 +1907,9 @@ class Simon42DashboardStrategyEditor extends LitElement {
           'show-locks-in-rooms',
           localize('editor.show_locks_in_rooms'),
           showLocksInRooms,
-          (checked) => this._toggleChanged('show_locks_in_rooms', checked, false)
+          (checked) => {
+            this._toggleChanged('show_locks_in_rooms', checked, false);
+          }
         )}
         <div class="description">${localize('editor.show_locks_in_rooms_desc')}</div>
 
@@ -1783,7 +1917,9 @@ class Simon42DashboardStrategyEditor extends LitElement {
           'show-automations-in-rooms',
           localize('editor.show_automations_in_rooms'),
           showAutomationsInRooms,
-          (checked) => this._toggleChanged('show_automations_in_rooms', checked, false)
+          (checked) => {
+            this._toggleChanged('show_automations_in_rooms', checked, false);
+          }
         )}
         <div class="description">${localize('editor.show_automations_in_rooms_desc')}</div>
 
@@ -1791,7 +1927,9 @@ class Simon42DashboardStrategyEditor extends LitElement {
           'show-scripts-in-rooms',
           localize('editor.show_scripts_in_rooms'),
           showScriptsInRooms,
-          (checked) => this._toggleChanged('show_scripts_in_rooms', checked, false)
+          (checked) => {
+            this._toggleChanged('show_scripts_in_rooms', checked, false);
+          }
         )}
         <div class="description">${localize('editor.show_scripts_in_rooms_desc')}</div>
 
@@ -1799,7 +1937,9 @@ class Simon42DashboardStrategyEditor extends LitElement {
           'use-default-area-sort',
           localize('editor.use_default_area_sort'),
           useDefaultAreaSort,
-          (checked) => this._toggleChanged('use_default_area_sort', checked, false)
+          (checked) => {
+            this._toggleChanged('use_default_area_sort', checked, false);
+          }
         )}
         <div class="description">${localize('editor.use_default_area_sort_desc')}</div>
 
@@ -1843,11 +1983,15 @@ class Simon42DashboardStrategyEditor extends LitElement {
                         class="entity-list-item"
                         data-entity-id=${entityId}
                         draggable="true"
-                        @dragstart=${(ev: DragEvent) => this._handleEntityDragStart(ev, 'room_pins')}
+                        @dragstart=${(ev: DragEvent) => {
+                          this._handleEntityDragStart(ev, 'room_pins');
+                        }}
                         @dragend=${this._handleEntityDragEnd}
                         @dragover=${this._handleEntityDragOver}
                         @dragleave=${this._handleEntityDragLeave}
-                        @drop=${(ev: DragEvent) => this._handleEntityDrop(ev, 'room_pins')}
+                        @drop=${(ev: DragEvent) => {
+                          this._handleEntityDrop(ev, 'room_pins');
+                        }}
                       >
                         <span class="drag-icon">&#x2630;</span>
                         <span class="item-info">
@@ -1855,7 +1999,14 @@ class Simon42DashboardStrategyEditor extends LitElement {
                           <span class="item-entity-id">${entityId}</span>
                           <span class="item-area">&#x1F4CD; ${areaName}</span>
                         </span>
-                        <button class="btn-remove" @click=${() => this._removeRoomPinEntity(entityId)}>&#x2715;</button>
+                        <button
+                          class="btn-remove"
+                          @click=${() => {
+                            this._removeRoomPinEntity(entityId);
+                          }}
+                        >
+                          &#x2715;
+                        </button>
                       </div>
                     `;
                   })}
@@ -1870,7 +2021,7 @@ class Simon42DashboardStrategyEditor extends LitElement {
             placeholder=${localize('editor.select_entity') + '...'}
             .value=${this._roomPinSearch}
             @input=${(e: Event) => {
-              this._roomPinSearch = (e.target as HTMLInputElement).value;
+              this._roomPinSearch = this._readTextFromEvent(e);
               this.requestUpdate();
             }}
             @blur=${() => {
@@ -1907,14 +2058,16 @@ class Simon42DashboardStrategyEditor extends LitElement {
         </div>
         <div class="description">${unsafeHTML(localize('editor.room_pins_desc'))}</div>
 
-        ${this._renderCheckbox('room-pins-show-state', localize('editor.show_state'), roomPinsShowState, (checked) =>
-          this._toggleChanged('room_pins_show_state', checked, false)
-        )}
+        ${this._renderCheckbox('room-pins-show-state', localize('editor.show_state'), roomPinsShowState, (checked) => {
+          this._toggleChanged('room_pins_show_state', checked, false);
+        })}
         ${this._renderCheckbox(
           'room-pins-hide-last-changed',
           localize('editor.hide_last_changed'),
           roomPinsHideLastChanged,
-          (checked) => this._toggleChanged('room_pins_hide_last_changed', checked, false)
+          (checked) => {
+            this._toggleChanged('room_pins_hide_last_changed', checked, false);
+          }
         )}
       </div>
     `;
@@ -1932,13 +2085,15 @@ class Simon42DashboardStrategyEditor extends LitElement {
           'show-summary-views',
           localize('editor.show_summary_views'),
           showSummaryViews,
-          (checked) => this._toggleChanged('show_summary_views', checked, false)
+          (checked) => {
+            this._toggleChanged('show_summary_views', checked, false);
+          }
         )}
         <div class="description">${localize('editor.show_summary_views_desc')}</div>
 
-        ${this._renderCheckbox('show-room-views', localize('editor.show_room_views'), showRoomViews, (checked) =>
-          this._toggleChanged('show_room_views', checked, false)
-        )}
+        ${this._renderCheckbox('show-room-views', localize('editor.show_room_views'), showRoomViews, (checked) => {
+          this._toggleChanged('show_room_views', checked, false);
+        })}
         <div class="description">${localize('editor.show_room_views_desc')}</div>
       </div>
     `;
@@ -1969,7 +2124,9 @@ class Simon42DashboardStrategyEditor extends LitElement {
             .value=${customCardsHeading}
             placeholder=${localize('editor.custom_cards_heading_placeholder')}
             style="flex: 2;"
-            @change=${this._customCardsHeadingChanged}
+            @change=${(e: Event) => {
+              this._customCardsHeadingChanged(e);
+            }}
           />
           <input
             type="text"
@@ -1977,7 +2134,9 @@ class Simon42DashboardStrategyEditor extends LitElement {
             .value=${customCardsIcon}
             placeholder="mdi:cards"
             style="flex: 1;"
-            @change=${this._customCardsIconChanged}
+            @change=${(e: Event) => {
+              this._customCardsIconChanged(e);
+            }}
           />
         </div>
         <div class="description" style="margin-bottom: 8px;">${localize('editor.custom_cards_desc')}</div>
@@ -2076,7 +2235,10 @@ class Simon42DashboardStrategyEditor extends LitElement {
           id=${id}
           ?checked=${checked}
           ?disabled=${disabled}
-          @change=${(e: Event) => onChange((e.target as HTMLInputElement).checked)}
+          @change=${(e: Event) => {
+            const checkedValue = this._readCheckedFromEvent(e);
+            onChange(checkedValue);
+          }}
         />
         <label for=${id} class=${disabled ? 'disabled-label' : ''}>${label}</label>
       </div>
@@ -2094,7 +2256,14 @@ class Simon42DashboardStrategyEditor extends LitElement {
       <div class="custom-item" data-index=${index}>
         <div class="custom-item-header">
           <strong>${view.title || localize('editor.new_view')}</strong>
-          <button class="btn-remove" @click=${() => this._removeCustomView(index)}>&#x2715;</button>
+          <button
+            class="btn-remove"
+            @click=${() => {
+              this._removeCustomView(index);
+            }}
+          >
+            &#x2715;
+          </button>
         </div>
         <div class="custom-item-fields">
           <div class="custom-item-row">
@@ -2103,21 +2272,27 @@ class Simon42DashboardStrategyEditor extends LitElement {
               .value=${view.title || ''}
               placeholder=${localize('editor.title_placeholder')}
               style="flex: 2;"
-              @change=${(e: Event) => this._updateCustomViewField(index, 'title', (e.target as HTMLInputElement).value)}
+              @change=${(e: Event) => {
+                this._updateCustomViewField(index, 'title', this._readTextFromEvent(e));
+              }}
             />
             <input
               type="text"
               .value=${view.path || ''}
               placeholder=${localize('editor.path_placeholder')}
               style="flex: 2;"
-              @change=${(e: Event) => this._updateCustomViewField(index, 'path', (e.target as HTMLInputElement).value)}
+              @change=${(e: Event) => {
+                this._updateCustomViewField(index, 'path', this._readTextFromEvent(e));
+              }}
             />
             <input
               type="text"
               .value=${view.icon || ''}
               placeholder="mdi:star"
               style="flex: 1;"
-              @change=${(e: Event) => this._updateCustomViewField(index, 'icon', (e.target as HTMLInputElement).value)}
+              @change=${(e: Event) => {
+                this._updateCustomViewField(index, 'icon', this._readTextFromEvent(e));
+              }}
             />
           </div>
           <textarea
@@ -2125,7 +2300,9 @@ class Simon42DashboardStrategyEditor extends LitElement {
             placeholder=${localize('editor.yaml_placeholder')}
             .value=${view.yaml || ''}
             style="width: 100%;"
-            @change=${(e: Event) => this._updateCustomViewYaml(index, (e.target as HTMLTextAreaElement).value)}
+            @change=${(e: Event) => {
+              this._updateCustomViewYaml(index, this._readTextAreaValue(e));
+            }}
           ></textarea>
           <div class="custom-item-validation">${validationMsg}</div>
         </div>
@@ -2144,25 +2321,35 @@ class Simon42DashboardStrategyEditor extends LitElement {
       <div class="custom-item" data-index=${index}>
         <div class="custom-item-header">
           <strong>${card.title || localize('editor.new_card')}</strong>
-          <button class="btn-remove" @click=${() => this._removeCustomCard(index)}>&#x2715;</button>
+          <button
+            class="btn-remove"
+            @click=${() => {
+              this._removeCustomCard(index);
+            }}
+          >
+            &#x2715;
+          </button>
         </div>
         <div class="custom-item-fields">
           <input
             type="text"
             .value=${card.title || ''}
             placeholder=${localize('editor.card_title_placeholder')}
-            @change=${(e: Event) => this._updateCustomCardField(index, 'title', (e.target as HTMLInputElement).value)}
+            @change=${(e: Event) => {
+              this._updateCustomCardField(index, 'title', this._readTextFromEvent(e));
+            }}
           />
           <div class="custom-card-target">
             <label>${localize('editor.target_section')}:</label>
             <select
-              @change=${(e: Event) =>
-                this._updateCustomCardField(index, 'target_section', (e.target as HTMLSelectElement).value)}
+              @change=${(e: Event) => {
+                this._updateCustomCardField(index, 'target_section', this._readSelectValue(e));
+              }}
             >
               ${(['custom_cards', 'overview', 'areas', 'weather', 'energy'] as const).map(
                 (key) => html`
                   <option value=${key} ?selected=${(card.target_section || 'custom_cards') === key}>
-                    ${localize(Simon42DashboardStrategyEditor._sectionMeta.get(key)!.labelKey)}
+                    ${localize(this._getSectionLabelKey(key))}
                   </option>
                 `
               )}
@@ -2173,7 +2360,9 @@ class Simon42DashboardStrategyEditor extends LitElement {
             placeholder=${localize('editor.yaml_placeholder')}
             .value=${card.yaml || ''}
             style="width: 100%;"
-            @change=${(e: Event) => this._updateCustomCardYaml(index, (e.target as HTMLTextAreaElement).value)}
+            @change=${(e: Event) => {
+              this._updateCustomCardYaml(index, this._readTextAreaValue(e));
+            }}
           ></textarea>
           <div class="custom-item-validation">${validationMsg}</div>
         </div>
@@ -2192,14 +2381,23 @@ class Simon42DashboardStrategyEditor extends LitElement {
       <div class="custom-item" data-index=${index}>
         <div class="custom-item-header">
           <strong>Badge ${index + 1}</strong>
-          <button class="btn-remove" @click=${() => this._removeCustomBadge(index)}>&#x2715;</button>
+          <button
+            class="btn-remove"
+            @click=${() => {
+              this._removeCustomBadge(index);
+            }}
+          >
+            &#x2715;
+          </button>
         </div>
         <textarea
           rows="4"
           placeholder="type: entity&#10;entity: sun.sun"
           .value=${badge.yaml || ''}
           style="width: 100%;"
-          @change=${(e: Event) => this._updateCustomBadgeYaml(index, (e.target as HTMLTextAreaElement).value)}
+          @change=${(e: Event) => {
+            this._updateCustomBadgeYaml(index, this._readTextAreaValue(e));
+          }}
         ></textarea>
         <div class="custom-item-validation">${validationMsg}</div>
       </div>
@@ -2251,7 +2449,10 @@ class Simon42DashboardStrategyEditor extends LitElement {
               class="area-checkbox"
               data-area-id=${area.area_id}
               ?checked=${!isHidden}
-              @change=${(e: Event) => this._areaVisibilityChanged(area.area_id, (e.target as HTMLInputElement).checked)}
+              @change=${(e: Event) => {
+                const checked = this._readCheckedFromEvent(e);
+                this._areaVisibilityChanged(area.area_id, checked);
+              }}
             />
             <span class="area-name">${area.name}</span>
             ${area.icon ? html`<ha-icon class="area-icon" icon=${area.icon}></ha-icon>` : nothing}
@@ -2259,7 +2460,9 @@ class Simon42DashboardStrategyEditor extends LitElement {
               class="expand-button ${isExpanded ? 'expanded' : ''}"
               data-area-id=${area.area_id}
               ?disabled=${isHidden}
-              @click=${(e: Event) => this._toggleAreaExpand(e, area.area_id)}
+              @click=${(e: Event) => {
+                this._toggleAreaExpand(e, area.area_id);
+              }}
             >
               <span class="expand-icon">&#x25B6;</span>
             </button>
@@ -2288,12 +2491,24 @@ class Simon42DashboardStrategyEditor extends LitElement {
       badgeCandidates,
       additionalBadges,
       availableEntities,
+      additionalSoilMoisture,
+      availableSoilMoistureEntities,
       defaultShowNames,
       namesVisible,
       namesHidden,
     } = data;
 
     const hass = this._hass!;
+    const selectedCleaningVacuum =
+      (this._config.areas_options?.[areaId]?.cleaning_vacuum_entity as string | undefined) || '';
+    const availableVacuums = Object.keys(hass.states)
+      .filter((entityId) => entityId.startsWith('vacuum.'))
+      .map((entityId) => {
+        const stateObj = hass.states[entityId];
+        const name = (stateObj.attributes?.friendly_name as string) || entityId;
+        return { entity_id: entityId, name };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
 
     const domainGroups: DomainGroup[] = [
       { key: 'lights', label: localize('editor.domain_lights'), icon: 'mdi:lightbulb' },
@@ -2305,106 +2520,198 @@ class Simon42DashboardStrategyEditor extends LitElement {
       { key: 'scenes', label: localize('editor.domain_scenes'), icon: 'mdi:palette' },
       { key: 'vacuum', label: localize('editor.domain_vacuum'), icon: 'mdi:robot-vacuum' },
       { key: 'fan', label: localize('editor.domain_fan'), icon: 'mdi:fan' },
+      { key: 'valves', label: localize('editor.domain_valves'), icon: 'mdi:valve' },
+      { key: 'soil_moisture', label: localize('editor.domain_soil_moisture'), icon: 'mdi:sprout' },
       { key: 'switches', label: localize('editor.domain_switches'), icon: 'mdi:light-switch' },
       { key: 'locks', label: localize('editor.domain_locks'), icon: 'mdi:lock' },
     ];
 
-    const hasEntities = domainGroups.some((g) => (groupedEntities[g.key]?.length ?? 0) > 0);
-    const hasBadges = (badgeCandidates?.length ?? 0) > 0 || (additionalBadges?.length ?? 0) > 0;
+    const hasEntities = domainGroups.some((group) => (groupedEntities[group.key]?.length ?? 0));
+    const hasBadges = badgeCandidates.length > 0 || additionalBadges.length > 0;
+    const hasSoilMoistureOptions =
+      groupedEntities.soil_moisture.length > 0 ||
+      additionalSoilMoisture.length > 0 ||
+      availableSoilMoistureEntities.length > 0;
 
-    if (!hasEntities && !hasBadges) {
-      return html`<div class="empty-state">${localize('editor.no_entities_in_area')}</div>`;
-    }
+    const showEntityGroups = hasEntities || hasBadges || hasSoilMoistureOptions;
 
     const expandedGroups = this._expandedGroups.get(areaId) || new Set<string>();
 
     return html`
-      <div class="entity-groups">
-        ${domainGroups.map((group) => {
-          const entities = groupedEntities[group.key] as string[] | undefined;
-          if (!entities || entities.length === 0) return nothing;
+      <div class="form-row" style="align-items: center; margin-bottom: 10px;">
+        <label for="cleaning-vacuum-${areaId}" style="min-width: 170px;"
+          >${localize('editor.area_cleaning_vacuum')}</label
+        >
+        <select
+          id="cleaning-vacuum-${areaId}"
+          style="flex: 1;"
+          @change=${(e: Event) => {
+            this._areaCleaningVacuumChanged(areaId, this._readSelectValue(e));
+          }}
+        >
+          <option value="">${localize('editor.area_cleaning_vacuum_none')}</option>
+          ${availableVacuums.map(
+            (vacuum) => html`
+              <option value=${vacuum.entity_id} ?selected=${selectedCleaningVacuum === vacuum.entity_id}>
+                ${vacuum.name}
+              </option>
+            `
+          )}
+        </select>
+      </div>
+      <div class="description" style="margin-bottom: 10px;">${localize('editor.area_cleaning_vacuum_desc')}</div>
+      ${!showEntityGroups
+        ? html`<div class="empty-state">${localize('editor.no_entities_in_area')}</div>`
+        : html`
+            <div class="entity-groups">
+              ${domainGroups.map((group) => {
+                const safeAreaId = this._sanitizeAreaId(areaId);
+                const safeGroupKey = this._sanitizeGroupKey(group.key);
+                const entities = groupedEntities[group.key] as string[];
+                const soilMoistureAdditional =
+                  group.key === 'soil_moisture'
+                    ? additionalSoilMoisture.filter((entityId) => !entities.includes(entityId))
+                    : [];
+                const soilMoistureAvailable = group.key === 'soil_moisture' ? availableSoilMoistureEntities : [];
+                const groupCount = entities.length + soilMoistureAdditional.length;
 
-          const hiddenInGroup = (hiddenEntities[group.key] || []) as string[];
-          const allHidden = entities.every((e) => hiddenInGroup.includes(e));
-          const someHidden = entities.some((e) => hiddenInGroup.includes(e)) && !allHidden;
-          const isGroupExpanded = expandedGroups.has(group.key);
+                if (groupCount === 0 && soilMoistureAvailable.length === 0) return nothing;
 
-          return html`
-            <div class="entity-group" data-group=${group.key}>
-              <div class="entity-group-header" @click=${() => this._toggleGroupExpand(areaId, group.key)}>
-                <input
-                  type="checkbox"
-                  class="group-checkbox"
-                  data-area-id=${areaId}
-                  data-group=${group.key}
-                  ?checked=${!allHidden}
-                  .indeterminate=${someHidden}
-                  @click=${(e: Event) => e.stopPropagation()}
-                  @change=${(e: Event) => {
-                    e.stopPropagation();
-                    const checked = (e.target as HTMLInputElement).checked;
-                    this._groupVisibilityChanged(areaId, group.key, checked, entities);
-                  }}
-                />
-                <ha-icon icon=${group.icon}></ha-icon>
-                <span class="group-name">${group.label}</span>
-                <span class="entity-count">(${entities.length})</span>
-                <button
-                  class="expand-button-small ${isGroupExpanded ? 'expanded' : ''}"
-                  @click=${(e: Event) => {
-                    e.stopPropagation();
-                    this._toggleGroupExpand(areaId, group.key);
-                  }}
-                >
-                  <span class="expand-icon-small">&#x25B6;</span>
-                </button>
-              </div>
-              ${isGroupExpanded
-                ? html`
-                    <div class="entity-list" data-area-id=${areaId} data-group=${group.key}>
-                      ${entities.map((entityId) => {
-                        const stateObj = hass.states[entityId];
-                        const name = stateObj?.attributes.friendly_name || entityId.split('.')[1].replace(/_/g, ' ');
-                        const isEntityHidden = hiddenInGroup.includes(entityId);
-                        return html`
-                          <div class="entity-item">
-                            <input
-                              type="checkbox"
-                              class="entity-checkbox"
-                              ?checked=${!isEntityHidden}
-                              @change=${(e: Event) =>
-                                this._entityVisibilityChanged(
-                                  areaId,
-                                  group.key,
-                                  entityId,
-                                  (e.target as HTMLInputElement).checked
-                                )}
-                            />
-                            <span class="entity-name">${name}</span>
-                            <span class="entity-id">${entityId}</span>
-                          </div>
-                        `;
-                      })}
+                const hiddenInGroup = (hiddenEntities[group.key] || []) as string[];
+                const allHidden = entities.length > 0 && entities.every((e) => hiddenInGroup.includes(e));
+                const someHidden = entities.some((e) => hiddenInGroup.includes(e)) && !allHidden;
+                const isGroupExpanded = expandedGroups.has(group.key);
+
+                return html`
+                  <div class="entity-group" data-group=${group.key}>
+                    <div
+                      class="entity-group-header"
+                      @click=${() => {
+                        this._toggleGroupExpand(safeAreaId, safeGroupKey);
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        class="group-checkbox"
+                        data-area-id=${safeAreaId}
+                        data-group=${safeGroupKey}
+                        ?checked=${!allHidden}
+                        .indeterminate=${someHidden}
+                        @click=${(e: Event) => {
+                          e.stopPropagation();
+                        }}
+                        @change=${(e: Event) => {
+                          e.stopPropagation();
+                          const checked = this._readCheckedFromEvent(e);
+                          this._groupVisibilityChanged(safeAreaId, safeGroupKey, checked, entities);
+                        }}
+                      />
+                      <ha-icon icon=${group.icon}></ha-icon>
+                      <span class="group-name">${group.label}</span>
+                      <span class="entity-count">(${groupCount})</span>
+                      <button
+                        class="expand-button-small ${isGroupExpanded ? 'expanded' : ''}"
+                        @click=${(e: Event) => {
+                          e.stopPropagation();
+                          this._toggleGroupExpand(safeAreaId, safeGroupKey);
+                        }}
+                      >
+                        <span class="expand-icon-small">&#x25B6;</span>
+                      </button>
                     </div>
-                  `
+                    ${isGroupExpanded
+                      ? html`
+                          <div class="entity-list" data-area-id=${safeAreaId} data-group=${safeGroupKey}>
+                            ${entities.map((entityId) => {
+                              const safeEntityId = this._sanitizeEntityId(entityId);
+                              if (!safeEntityId) return nothing;
+                              const stateObj = hass.states[entityId];
+                              const name =
+                                stateObj?.attributes.friendly_name || entityId.split('.')[1].replace(/_/g, ' ');
+                              const isEntityHidden = hiddenInGroup.includes(entityId);
+                              return html`
+                                <div class="entity-item">
+                                  <input
+                                    type="checkbox"
+                                    class="entity-checkbox"
+                                    ?checked=${!isEntityHidden}
+                                    @change=${(e: Event) => {
+                                      const checked = this._readCheckedFromEvent(e);
+                                      this._entityVisibilityChanged(safeAreaId, safeGroupKey, safeEntityId, checked);
+                                    }}
+                                  />
+                                  <span class="entity-name">${name}</span>
+                                  <span class="entity-id">${entityId}</span>
+                                </div>
+                              `;
+                            })}
+                            ${group.key === 'soil_moisture' && soilMoistureAdditional.length > 0
+                              ? html`
+                                  <div class="badge-separator">${localize('editor.badges_additional')}</div>
+                                  ${soilMoistureAdditional.map((entityId) => {
+                                    const stateObj = hass.states[entityId];
+                                    const name =
+                                      stateObj?.attributes.friendly_name || entityId.split('.')[1].replace(/_/g, ' ');
+
+                                    return html`
+                                      <div class="entity-item badge-additional-item">
+                                        <span class="entity-name">${name}</span>
+                                        <span class="entity-id">${entityId}</span>
+                                        <button
+                                          class="badge-remove-btn"
+                                          title=${localize('editor.badges_remove')}
+                                          @click=${() => {
+                                            this._soilMoistureAdditionalChanged(safeAreaId, entityId, false);
+                                          }}
+                                        >
+                                          &#x2715;
+                                        </button>
+                                      </div>
+                                    `;
+                                  })}
+                                `
+                              : nothing}
+                            ${group.key === 'soil_moisture' && soilMoistureAvailable.length > 0
+                              ? html`
+                                  <div class="badge-add-section">
+                                    <select class="soil-moisture-entity-picker" data-area-id=${areaId}>
+                                      <option value="">${localize('editor.badges_select_entity')}</option>
+                                      ${soilMoistureAvailable.map(
+                                        (e) => html` <option value=${e.entity_id}>${e.name} (${e.entity_id})</option> `
+                                      )}
+                                    </select>
+                                    <button
+                                      class="badge-add-button"
+                                      @click=${(e: Event) => {
+                                        this._addSoilMoistureFromPicker(e, safeAreaId);
+                                      }}
+                                    >
+                                      ${localize('editor.badges_add')}
+                                    </button>
+                                  </div>
+                                `
+                              : nothing}
+                          </div>
+                        `
+                      : nothing}
+                  </div>
+                `;
+              })}
+              ${hasBadges
+                ? this._renderBadgeGroup(
+                    areaId,
+                    badgeCandidates,
+                    additionalBadges,
+                    availableEntities,
+                    hiddenEntities,
+                    defaultShowNames,
+                    namesVisible,
+                    namesHidden,
+                    expandedGroups
+                  )
                 : nothing}
             </div>
-          `;
-        })}
-        ${hasBadges
-          ? this._renderBadgeGroup(
-              areaId,
-              badgeCandidates,
-              additionalBadges,
-              availableEntities,
-              hiddenEntities,
-              defaultShowNames,
-              namesVisible,
-              namesHidden,
-              expandedGroups
-            )
-          : nothing}
-      </div>
+          `}
     `;
   }
 
@@ -2420,15 +2727,17 @@ class Simon42DashboardStrategyEditor extends LitElement {
     expandedGroups: Set<string>
   ): TemplateResult {
     const hass = this._hass!;
+    const safeAreaId = this._sanitizeAreaId(areaId);
+    if (!safeAreaId) return html``;
     const totalCount = badgeCandidates.length + additionalBadges.length;
     if (totalCount === 0) return html``;
 
-    const hiddenInBadges = hiddenEntities['badges'] || [];
+    const hiddenInBadges =  (hiddenEntities['badges'] || [])
     const allHidden = badgeCandidates.length > 0 && badgeCandidates.every((e) => hiddenInBadges.includes(e));
     const someHidden = badgeCandidates.some((e) => hiddenInBadges.includes(e)) && !allHidden;
 
-    const namesVisibleSet = new Set(namesVisible || []);
-    const namesHiddenSet = new Set(namesHidden || []);
+    const namesVisibleSet = new Set(namesVisible);
+    const namesHiddenSet = new Set(namesHidden);
 
     const isNameShown = (entityId: string): boolean =>
       resolveShowName(entityId, defaultShowNames.has(entityId), namesVisibleSet, namesHiddenSet);
@@ -2437,19 +2746,26 @@ class Simon42DashboardStrategyEditor extends LitElement {
 
     return html`
       <div class="entity-group" data-group="badges">
-        <div class="entity-group-header" @click=${() => this._toggleGroupExpand(areaId, 'badges')}>
+        <div
+          class="entity-group-header"
+          @click=${() => {
+            this._toggleGroupExpand(safeAreaId, 'badges');
+          }}
+        >
           <input
             type="checkbox"
             class="group-checkbox"
-            data-area-id=${areaId}
+            data-area-id=${safeAreaId}
             data-group="badges"
             ?checked=${!allHidden}
             .indeterminate=${someHidden}
-            @click=${(e: Event) => e.stopPropagation()}
+            @click=${(e: Event) => {
+              e.stopPropagation();
+            }}
             @change=${(e: Event) => {
               e.stopPropagation();
-              const checked = (e.target as HTMLInputElement).checked;
-              this._groupVisibilityChanged(areaId, 'badges', checked, badgeCandidates);
+              const checked = this._readCheckedFromEvent(e);
+              this._groupVisibilityChanged(safeAreaId, 'badges', checked, badgeCandidates);
             }}
           />
           <ha-icon icon="mdi:checkbox-multiple-blank-circle"></ha-icon>
@@ -2459,7 +2775,7 @@ class Simon42DashboardStrategyEditor extends LitElement {
             class="expand-button-small ${isGroupExpanded ? 'expanded' : ''}"
             @click=${(e: Event) => {
               e.stopPropagation();
-              this._toggleGroupExpand(areaId, 'badges');
+              this._toggleGroupExpand(safeAreaId, 'badges');
             }}
           >
             <span class="expand-icon-small">&#x25B6;</span>
@@ -2467,8 +2783,10 @@ class Simon42DashboardStrategyEditor extends LitElement {
         </div>
         ${isGroupExpanded
           ? html`
-              <div class="entity-list" data-area-id=${areaId} data-group="badges">
+              <div class="entity-list" data-area-id=${safeAreaId} data-group="badges">
                 ${badgeCandidates.map((entityId) => {
+                  const safeEntityId = this._sanitizeEntityId(entityId);
+                  if (!safeEntityId) return nothing;
                   const stateObj = hass.states[entityId];
                   const name = stateObj?.attributes.friendly_name || entityId.split('.')[1].replace(/_/g, ' ');
                   const isHidden = hiddenInBadges.includes(entityId);
@@ -2480,13 +2798,10 @@ class Simon42DashboardStrategyEditor extends LitElement {
                         type="checkbox"
                         class="entity-checkbox"
                         ?checked=${!isHidden}
-                        @change=${(e: Event) =>
-                          this._entityVisibilityChanged(
-                            areaId,
-                            'badges',
-                            entityId,
-                            (e.target as HTMLInputElement).checked
-                          )}
+                        @change=${(e: Event) => {
+                          const checked = this._readCheckedFromEvent(e);
+                          this._entityVisibilityChanged(safeAreaId, 'badges', safeEntityId, checked);
+                        }}
                       />
                       <span class="entity-name">${name}</span>
                       <input
@@ -2494,8 +2809,10 @@ class Simon42DashboardStrategyEditor extends LitElement {
                         class="badge-name-checkbox"
                         ?checked=${showName}
                         title=${localize('editor.badges_show_name')}
-                        @change=${(e: Event) =>
-                          this._badgeShowNameChanged(areaId, entityId, (e.target as HTMLInputElement).checked)}
+                        @change=${(e: Event) => {
+                          const checked = this._readCheckedFromEvent(e);
+                          this._badgeShowNameChanged(safeAreaId, safeEntityId, checked);
+                        }}
                       />
                       <span class="badge-name-label">${localize('editor.badges_name_short')}</span>
                       <span class="entity-id">${entityId}</span>
@@ -2506,6 +2823,8 @@ class Simon42DashboardStrategyEditor extends LitElement {
                   ? html`
                       <div class="badge-separator">${localize('editor.badges_additional')}</div>
                       ${additionalBadges.map((entityId) => {
+                        const safeEntityId = this._sanitizeEntityId(entityId);
+                        if (!safeEntityId) return nothing;
                         const stateObj = hass.states[entityId];
                         const name = stateObj?.attributes.friendly_name || entityId.split('.')[1].replace(/_/g, ' ');
                         const showName = isNameShown(entityId);
@@ -2518,15 +2837,19 @@ class Simon42DashboardStrategyEditor extends LitElement {
                               class="badge-name-checkbox"
                               ?checked=${showName}
                               title=${localize('editor.badges_show_name')}
-                              @change=${(e: Event) =>
-                                this._badgeShowNameChanged(areaId, entityId, (e.target as HTMLInputElement).checked)}
+                              @change=${(e: Event) => {
+                                const checked = this._readCheckedFromEvent(e);
+                                this._badgeShowNameChanged(safeAreaId, safeEntityId, checked);
+                              }}
                             />
                             <span class="badge-name-label">${localize('editor.badges_name_short')}</span>
                             <span class="entity-id">${entityId}</span>
                             <button
                               class="badge-remove-btn"
                               title=${localize('editor.badges_remove')}
-                              @click=${() => this._badgeAdditionalChanged(areaId, entityId, false)}
+                              @click=${() => {
+                                this._badgeAdditionalChanged(safeAreaId, safeEntityId, false);
+                              }}
                             >
                               &#x2715;
                             </button>
@@ -2538,13 +2861,18 @@ class Simon42DashboardStrategyEditor extends LitElement {
                 ${availableEntities.length > 0
                   ? html`
                       <div class="badge-add-section">
-                        <select class="badge-entity-picker" data-area-id=${areaId}>
+                        <select class="badge-entity-picker" data-area-id=${safeAreaId}>
                           <option value="">${localize('editor.badges_select_entity')}</option>
                           ${availableEntities.map(
                             (e) => html` <option value=${e.entity_id}>${e.name} (${e.entity_id})</option> `
                           )}
                         </select>
-                        <button class="badge-add-button" @click=${(e: Event) => this._addBadgeFromPicker(e, areaId)}>
+                        <button
+                          class="badge-add-button"
+                          @click=${(e: Event) => {
+                            this._addBadgeFromPicker(e, safeAreaId);
+                          }}
+                        >
                           ${localize('editor.badges_add')}
                         </button>
                       </div>
@@ -2570,6 +2898,13 @@ class Simon42DashboardStrategyEditor extends LitElement {
     const badgeCandidates = getAreaBadgeCandidates(areaId, this._hass);
     const additionalBadges = getAdditionalBadgesForArea(areaId, this._config);
     const availableEntities = getAvailableBadgeEntities(areaId, this._hass, badgeCandidates, additionalBadges);
+    const additionalSoilMoisture = getAdditionalSoilMoistureForArea(areaId, this._config);
+    const availableSoilMoistureEntities = getAvailableSoilMoistureEntities(
+      areaId,
+      this._hass,
+      groupedEntities.soil_moisture,
+      additionalSoilMoisture
+    );
     const defaultShowNames = getDefaultShowNameEntities(badgeCandidates, this._hass);
     const { namesVisible, namesHidden } = getBadgeNamesConfig(areaId, this._config);
 
@@ -2580,6 +2915,8 @@ class Simon42DashboardStrategyEditor extends LitElement {
       badgeCandidates,
       additionalBadges,
       availableEntities,
+      additionalSoilMoisture,
+      availableSoilMoistureEntities,
       defaultShowNames,
       namesVisible,
       namesHidden,
@@ -2597,6 +2934,13 @@ class Simon42DashboardStrategyEditor extends LitElement {
     const badgeCandidates = getAreaBadgeCandidates(areaId, this._hass);
     const additionalBadges = getAdditionalBadgesForArea(areaId, this._config);
     const availableEntities = getAvailableBadgeEntities(areaId, this._hass, badgeCandidates, additionalBadges);
+    const additionalSoilMoisture = getAdditionalSoilMoistureForArea(areaId, this._config);
+    const availableSoilMoistureEntities = getAvailableSoilMoistureEntities(
+      areaId,
+      this._hass,
+      groupedEntities.soil_moisture,
+      additionalSoilMoisture
+    );
     const defaultShowNames = getDefaultShowNameEntities(badgeCandidates, this._hass);
     const { namesVisible, namesHidden } = getBadgeNamesConfig(areaId, this._config);
 
@@ -2607,6 +2951,8 @@ class Simon42DashboardStrategyEditor extends LitElement {
       badgeCandidates,
       additionalBadges,
       availableEntities,
+      additionalSoilMoisture,
+      availableSoilMoistureEntities,
       defaultShowNames,
       namesVisible,
       namesHidden,
@@ -2650,10 +2996,41 @@ class Simon42DashboardStrategyEditor extends LitElement {
     this._fireConfigChanged(newConfig);
   }
 
+  private _areaCleaningVacuumChanged(areaId: string, vacuumEntityId: string): void {
+    const safeAreaId = this._sanitizeAreaId(areaId);
+    if (!safeAreaId) return;
+
+    const currentAreaOptions = this._getAreaOptions(safeAreaId);
+    const newAreaOptions: AreaOptions = { ...currentAreaOptions };
+
+    if (vacuumEntityId) {
+      newAreaOptions.cleaning_vacuum_entity = vacuumEntityId;
+    } else {
+      delete newAreaOptions.cleaning_vacuum_entity;
+    }
+
+    const remainingEntries = Object.entries(this._config.areas_options || {}).filter(([id]) => id !== safeAreaId);
+    if (Object.keys(newAreaOptions).length > 0) {
+      remainingEntries.push([safeAreaId, newAreaOptions]);
+    }
+    const newAreasOptions = Object.fromEntries(remainingEntries) as Record<string, AreaOptions>;
+
+    const newConfig: Simon42StrategyConfig = { ...this._config };
+    if (Object.keys(newAreasOptions).length === 0) {
+      delete newConfig.areas_options;
+    } else {
+      newConfig.areas_options = newAreasOptions;
+    }
+
+    this._config = newConfig;
+    this._fireConfigChanged(newConfig);
+    this._refreshAreaCache(safeAreaId);
+  }
+
   private _alarmEntityChanged(e: Event): void {
     if (!this._hass) return;
 
-    const entityId = (e.target as HTMLSelectElement).value;
+    const entityId = this._readSelectValue(e);
     const newConfig: Simon42StrategyConfig = {
       ...this._config,
       alarm_entity: entityId,
@@ -2668,7 +3045,7 @@ class Simon42DashboardStrategyEditor extends LitElement {
   }
 
   private _batteryCriticalChanged(e: Event): void {
-    const value = parseInt((e.target as HTMLInputElement).value, 10);
+    const value = parseInt(this._readTextFromEvent(e), 10);
     if (isNaN(value) || value < 1 || value > 99) return;
     const newConfig: Simon42StrategyConfig = { ...this._config, battery_critical_threshold: value };
     if (value === 20) delete newConfig.battery_critical_threshold;
@@ -2677,7 +3054,7 @@ class Simon42DashboardStrategyEditor extends LitElement {
   }
 
   private _batteryLowChanged(e: Event): void {
-    const value = parseInt((e.target as HTMLInputElement).value, 10);
+    const value = parseInt(this._readTextFromEvent(e), 10);
     if (isNaN(value) || value < 1 || value > 99) return;
     const newConfig: Simon42StrategyConfig = { ...this._config, battery_low_threshold: value };
     if (value === 50) delete newConfig.battery_low_threshold;
@@ -2832,13 +3209,27 @@ class Simon42DashboardStrategyEditor extends LitElement {
     this._fireConfigChanged(newConfig);
   }
 
-  private _updateCustomViewField(index: number, field: string, value: string): void {
+  private _updateCustomViewField(index: number, field: 'title' | 'path' | 'icon', value: string): void {
     const customViews: CustomView[] = [...(this._config.custom_views || [])];
-    if (!customViews[index]) return;
+    if (!Number.isInteger(index) || index < 0 || index >= customViews.length) return;
 
-    customViews[index] = { ...customViews[index], [field]: value };
+    const safeValue = this._sanitizePlainTextInput(value);
+    const updatedViews = customViews.map((view, viewIndex) => {
+      if (viewIndex !== index) return view;
 
-    const newConfig: Simon42StrategyConfig = { ...this._config, custom_views: customViews };
+      switch (field) {
+        case 'title':
+          return { ...view, title: safeValue };
+        case 'path':
+          return { ...view, path: safeValue };
+        case 'icon':
+          return { ...view, icon: safeValue };
+        default:
+          return view;
+      }
+    });
+
+    const newConfig: Simon42StrategyConfig = { ...this._config, custom_views: updatedViews };
     this._config = newConfig;
     this._fireConfigChanged(newConfig);
   }
@@ -2878,7 +3269,7 @@ class Simon42DashboardStrategyEditor extends LitElement {
   // -- Custom Cards -----------------------------------------------------
 
   private _customCardsHeadingChanged(e: Event): void {
-    const value = (e.target as HTMLInputElement).value.trim();
+    const value = this._readTextFromEvent(e).trim();
     const newConfig: Simon42StrategyConfig = { ...this._config };
     if (value) {
       newConfig.custom_cards_heading = value;
@@ -2890,7 +3281,7 @@ class Simon42DashboardStrategyEditor extends LitElement {
   }
 
   private _customCardsIconChanged(e: Event): void {
-    const value = (e.target as HTMLInputElement).value.trim();
+    const value = this._readTextFromEvent(e).trim();
     const newConfig: Simon42StrategyConfig = { ...this._config };
     if (value) {
       newConfig.custom_cards_icon = value;
@@ -2925,13 +3316,34 @@ class Simon42DashboardStrategyEditor extends LitElement {
     this._fireConfigChanged(newConfig);
   }
 
-  private _updateCustomCardField(index: number, field: string, value: string): void {
+  private _updateCustomCardField(index: number, field: 'title' | 'target_section', value: string): void {
     const customCards: CustomCard[] = [...(this._config.custom_cards || [])];
-    if (!customCards[index]) return;
+    if (!Number.isInteger(index) || index < 0 || index >= customCards.length) return;
 
-    customCards[index] = { ...customCards[index], [field]: value };
+    const sanitizedValue = this._sanitizePlainTextInput(value);
+    const nextValue =
+      field === 'target_section'
+        ? (['custom_cards', 'overview', 'areas', 'weather', 'energy'] as const).includes(
+            sanitizedValue as 'custom_cards' | 'overview' | 'areas' | 'weather' | 'energy'
+          )
+          ? sanitizedValue
+          : 'custom_cards'
+        : sanitizedValue;
 
-    const newConfig: Simon42StrategyConfig = { ...this._config, custom_cards: customCards };
+    const updatedCards = customCards.map((card, cardIndex) => {
+      if (cardIndex !== index) return card;
+
+      switch (field) {
+        case 'title':
+          return { ...card, title: nextValue };
+        case 'target_section':
+          return { ...card, target_section: nextValue as CustomCard['target_section'] };
+        default:
+          return card;
+      }
+    });
+
+    const newConfig: Simon42StrategyConfig = { ...this._config, custom_cards: updatedCards };
     this._config = newConfig;
     this._fireConfigChanged(newConfig);
   }
@@ -3340,6 +3752,82 @@ class Simon42DashboardStrategyEditor extends LitElement {
     picker.value = '';
   }
 
+  private _soilMoistureAdditionalChanged(areaId: string, entityId: string, isAdd: boolean): void {
+    if (!this._config) return;
+
+    const currentAreaOptions = this._config.areas_options?.[areaId] || {};
+    const currentGroupsOptions = currentAreaOptions.groups_options || {};
+    const currentGroupOptions = currentGroupsOptions['soil_moisture'] || {};
+
+    let additional = [...(currentGroupOptions.additional || [])];
+
+    if (isAdd) {
+      if (!additional.includes(entityId)) additional.push(entityId);
+    } else {
+      additional = additional.filter((e) => e !== entityId);
+    }
+
+    const newGroupOptions: Record<string, any> = { ...currentGroupOptions };
+    if (additional.length > 0) {
+      newGroupOptions.additional = additional;
+    } else {
+      delete newGroupOptions.additional;
+    }
+
+    const newGroupsOptions: Record<string, any> = {
+      ...currentGroupsOptions,
+      soil_moisture: newGroupOptions,
+    };
+
+    if (Object.keys(newGroupsOptions.soil_moisture).length === 0) {
+      delete newGroupsOptions.soil_moisture;
+    }
+
+    const newAreaOptions: Record<string, any> = {
+      ...currentAreaOptions,
+      groups_options: newGroupsOptions,
+    };
+
+    if (Object.keys(newAreaOptions.groups_options).length === 0) {
+      delete newAreaOptions.groups_options;
+    }
+
+    const newAreasOptions: Record<string, any> = {
+      ...this._config.areas_options,
+      [areaId]: newAreaOptions,
+    };
+
+    if (Object.keys(newAreasOptions[areaId]).length === 0) {
+      delete newAreasOptions[areaId];
+    }
+
+    const newConfig: Simon42StrategyConfig = {
+      ...this._config,
+      areas_options: newAreasOptions,
+    };
+
+    if (newConfig.areas_options && Object.keys(newConfig.areas_options).length === 0) {
+      delete newConfig.areas_options;
+    }
+
+    this._config = newConfig;
+    this._fireConfigChanged(newConfig);
+
+    this._refreshAreaCache(areaId);
+  }
+
+  private _addSoilMoistureFromPicker(e: Event, areaId: string): void {
+    e.stopPropagation();
+    const picker = this.shadowRoot!.querySelector(
+      `.soil-moisture-entity-picker[data-area-id="${areaId}"]`
+    ) as HTMLSelectElement | null;
+    if (!picker || !picker.value) return;
+
+    const entityId = picker.value;
+    this._soilMoistureAdditionalChanged(areaId, entityId, true);
+    picker.value = '';
+  }
+
   // ====================================================================
   // DRAG AND DROP
   // ====================================================================
@@ -3581,6 +4069,8 @@ async function getAreaGroupedEntities(areaId: string, hass: HomeAssistant): Prom
     media_player: [],
     vacuum: [],
     fan: [],
+    valves: [],
+    soil_moisture: [],
     switches: [],
     locks: [],
     automations: [],
@@ -3632,12 +4122,18 @@ async function getAreaGroupedEntities(areaId: string, hass: HomeAssistant): Prom
       roomEntities.scenes.push(entity.entity_id);
     } else if (domain === 'climate') {
       roomEntities.climate.push(entity.entity_id);
+    } else if (domain === 'humidifier') {
+      roomEntities.climate.push(entity.entity_id);
     } else if (domain === 'media_player') {
       roomEntities.media_player.push(entity.entity_id);
     } else if (domain === 'vacuum') {
       roomEntities.vacuum.push(entity.entity_id);
     } else if (domain === 'fan') {
       roomEntities.fan.push(entity.entity_id);
+    } else if (domain === 'valve') {
+      roomEntities.valves.push(entity.entity_id);
+    } else if (domain === 'sensor' && deviceClass === 'moisture') {
+      roomEntities.soil_moisture.push(entity.entity_id);
     } else if (domain === 'switch') {
       roomEntities.switches.push(entity.entity_id);
     } else if (domain === 'lock') {
@@ -3691,6 +4187,10 @@ function getAdditionalBadgesForArea(areaId: string, config: Simon42StrategyConfi
   return config.areas_options?.[areaId]?.groups_options?.badges?.additional || [];
 }
 
+function getAdditionalSoilMoistureForArea(areaId: string, config: Simon42StrategyConfig): string[] {
+  return config.areas_options?.[areaId]?.groups_options?.soil_moisture?.additional || [];
+}
+
 function getAvailableBadgeEntities(
   areaId: string,
   hass: HomeAssistant,
@@ -3721,6 +4221,47 @@ function getAvailableBadgeEntities(
     if (excludeSet.has(entity.entity_id)) continue;
 
     const stateObj = hass.states[entity.entity_id];
+    const name = (stateObj.attributes?.friendly_name as string) || entity.entity_id.split('.')[1].replace(/_/g, ' ');
+    available.push({ entity_id: entity.entity_id, name });
+  }
+
+  available.sort((a, b) => a.name.localeCompare(b.name));
+  return available;
+}
+
+function getAvailableSoilMoistureEntities(
+  areaId: string,
+  hass: HomeAssistant,
+  existingEntities: string[],
+  existingAdditional: string[]
+): Array<{ entity_id: string; name: string }> {
+  const devices = Object.values(hass.devices || {});
+  const entities = Object.values(hass.entities || {});
+  const excludeSet = new Set([...existingEntities, ...existingAdditional]);
+
+  const areaDevices = new Set<string>();
+  for (const device of devices) {
+    if (device.area_id === areaId) areaDevices.add(device.id);
+  }
+
+  const available: Array<{ entity_id: string; name: string }> = [];
+
+  for (const entity of entities) {
+    let belongsToArea = false;
+    if (entity.area_id) belongsToArea = entity.area_id === areaId;
+    else if (entity.device_id && areaDevices.has(entity.device_id)) belongsToArea = true;
+    if (!belongsToArea) continue;
+    if (entity.hidden) continue;
+    if (!hass.states[entity.entity_id]) continue;
+
+    const domain = entity.entity_id.split('.')[0];
+    if (domain !== 'sensor') continue;
+    if (excludeSet.has(entity.entity_id)) continue;
+
+    const stateObj = hass.states[entity.entity_id];
+    const deviceClass = stateObj.attributes?.device_class as string | undefined;
+    if (deviceClass !== 'moisture') continue;
+
     const name = (stateObj.attributes?.friendly_name as string) || entity.entity_id.split('.')[1].replace(/_/g, ' ');
     available.push({ entity_id: entity.entity_id, name });
   }

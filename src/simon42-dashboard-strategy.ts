@@ -10,7 +10,7 @@ import type { HomeAssistant } from './types/homeassistant';
 import type { Simon42StrategyConfig } from './types/strategy';
 import type { LovelaceConfig, LovelaceViewConfig } from './types/lovelace';
 
-const STRATEGY_VERSION = '1.3.5-beta.2';
+const STRATEGY_VERSION = '1.3.5-beta.13';
 
 const DEBUG = new URLSearchParams(window.location.search).has('s42_debug');
 const T0 = performance.now();
@@ -29,6 +29,7 @@ const modulesPromise = Promise.all([
   import('./views/CoversViewStrategy'),
   import('./views/SecurityViewStrategy'),
   import('./views/BatteriesViewStrategy'),
+  import('./views/ValvesViewStrategy'),
   import('./views/ClimateViewStrategy'),
   import('./views/CamerasViewStrategy'),
   import('./views/AirQualityViewStrategy'),
@@ -65,6 +66,7 @@ class Simon42DashboardStrategy extends HTMLElement {
     const showCovers = config.show_covers_summary !== false;
     const showSecurity = config.show_security_summary !== false;
     const showBatteries = config.show_battery_summary !== false;
+    const showValves = config.show_valves_summary === true;
     const showClimate = config.show_climate_summary === true;
     const showCameras = config.show_camera_summary === true;
     const showAirQuality = config.show_air_quality_summary === true;
@@ -109,6 +111,13 @@ class Simon42DashboardStrategy extends HTMLElement {
         path: 'batteries',
         icon: 'mdi:battery-alert',
         resolve: () => getStrategy('ll-strategy-simon42-view-batteries').generate({ config }, hass),
+      },
+      {
+        enabled: showValves,
+        title: localize('views.valves'),
+        path: 'valves',
+        icon: 'mdi:valve',
+        resolve: () => getStrategy('ll-strategy-simon42-view-valves').generate({ config }, hass),
       },
       {
         enabled: showClimate,
