@@ -12,6 +12,7 @@ import {
   getAirQualityEntities,
   getAirQualityEntityInfo,
   SECURITY_EXCLUDED_PLATFORMS,
+  type AirQualityMetric,
   type AirQualityStatus,
 } from '../utils/entity-filter';
 
@@ -21,7 +22,7 @@ declare global {
   }
 }
 
-type SummaryType = 'lights' | 'covers' | 'security' | 'batteries' | 'valves' | 'climate' | 'air_quality';
+type SummaryType = 'lights' | 'covers' | 'security' | 'batteries' | 'valves' | 'climate' | 'cameras' | 'air_quality';
 
 interface SummaryCardConfig {
   summary_type: SummaryType;
@@ -108,6 +109,27 @@ class Simon42SummaryCard extends LitElement {
       font-weight: 500;
       line-height: 1.2;
       color: var(--primary-text-color);
+    }
+    .air-quality-rows {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: 2px;
+    }
+    .air-quality-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      line-height: 1.3;
+      gap: 6px;
+    }
+    .air-quality-label {
+      color: var(--secondary-text-color);
+    }
+    .air-quality-status {
+      font-weight: 600;
     }
   `;
 
@@ -207,8 +229,16 @@ class Simon42SummaryCard extends LitElement {
         );
         break;
 
+      case 'cameras':
+        result = Registry.getVisibleEntityIdsForDomain('camera').filter(
+          (id) => hass.states[id] && this._isEntityRelevant(id, hass.states[id])
+        );
+        break;
+
       case 'air_quality':
         result = getAirQualityEntities(hass, this._config).map((item) => item.entityId);
+        break;
+
       case 'climate':
         result = [
           ...Registry.getVisibleEntityIdsForDomain('climate'),
@@ -307,6 +337,9 @@ class Simon42SummaryCard extends LitElement {
         }
         return count;
 
+      case 'cameras':
+        return this._relevantEntityIds.size;
+
       case 'air_quality': {
         const status = this._getAirQualitySummaryStatus();
         if (status === 'ok') return 0;
@@ -385,6 +418,14 @@ class Simon42SummaryCard extends LitElement {
         color: hasItems ? 'orange' : 'grey',
         path: 'climate',
       },
+      cameras: {
+        icon: 'mdi:cctv',
+        name: hasItems
+          ? `${count} ${count === 1 ? localize('summary.cameras_one') : localize('summary.cameras_many')}`
+          : localize('summary.cameras_off'),
+        color: hasItems ? 'blue' : 'grey',
+        path: 'cameras',
+      },
       air_quality: {
         icon: hasItems
           ? airQualitySummaryStatus === 'critical'
@@ -422,6 +463,23 @@ class Simon42SummaryCard extends LitElement {
     }
 
     return hasWarning ? 'warning' : 'ok';
+  }
+
+  private _getAirQualityMetricStatus(metric: AirQualityMetric): AirQualityStatus | 'none' {
+    if (!this.hass) return 'none';
+
+    const entities = getAirQualityEntities(this.hass, this._config).filter((item) => item.metric === metric);
+    if (entities.length === 0) return 'none';
+    if (entities.some((item) => item.status === 'critical')) return 'critical';
+    if (entities.some((item) => item.status === 'warning')) return 'warning';
+    return 'ok';
+  }
+
+  private _getAirQualityStatusColor(status: AirQualityStatus | 'none'): string {
+    if (status === 'critical') return COLOR_MAP.red;
+    if (status === 'warning') return COLOR_MAP.yellow;
+    if (status === 'ok') return COLOR_MAP.blue;
+    return COLOR_MAP.grey;
   }
 
   private _getBatterySummaryStatus(): BatterySummaryStatus {
@@ -491,6 +549,39 @@ class Simon42SummaryCard extends LitElement {
   protected render() {
     const display = this._getDisplayConfig();
     const colorCss = COLOR_MAP[display.color] || COLOR_MAP.grey;
+
+    if (this._config.summary_type === 'air_quality') {
+      const qualityStatus = this._getAirQualityMetricStatus('co2');
+      const humidityStatus = this._getAirQualityMetricStatus('humidity');
+      const temperatureStatus = this._getAirQualityMetricStatus('temperature');
+      const rows = [
+        { label: localize('summary.air_quality_row_quality'), status: qualityStatus },
+        { label: localize('summary.air_quality_row_humidity'), status: humidityStatus },
+        { label: localize('summary.air_quality_row_temperature'), status: temperatureStatus },
+      ].filter((row) => row.status !== 'none');
+
+      return html`
+        <ha-card @click=${() => this._handleClick()}>
+          <ha-icon class="icon" .icon=${display.icon} style="color: ${colorCss}"></ha-icon>
+          ${rows.length > 0
+            ? html`
+                <div class="air-quality-rows">
+                  ${rows.map(
+                    (row) => html`
+                      <div class="air-quality-row">
+                        <span class="air-quality-label">${row.label}</span>
+                        <span class="air-quality-status" style="color: ${this._getAirQualityStatusColor(row.status)};">
+                          ${localize(`air_quality.${row.status}`)}
+                        </span>
+                      </div>
+                    `
+                  )}
+                </div>
+              `
+            : html`<div class="name">${display.name}</div>`}
+        </ha-card>
+      `;
+    }
 
     return html`
       <ha-card @click=${() => this._handleClick()}>
