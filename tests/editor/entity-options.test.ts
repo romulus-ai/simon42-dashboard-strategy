@@ -8,8 +8,7 @@
 
 import { describe, it, expect } from 'vitest';
 
-import { getAllEntitiesForSelect } from '../../src/editor/entity-options';
-import { getPresenceSimulationEntities } from '../../src/editor/entity-options';
+import { getAllEntitiesForSelect, getPresenceSimulationEntities } from '../../src/editor/entity-options';
 import { makeHass } from '../fixtures/hass';
 
 describe('getAllEntitiesForSelect', () => {
@@ -30,6 +29,7 @@ describe('getAllEntitiesForSelect', () => {
     expect(byId.get('camera.lens2')?.area_id).toBe('kitchen');
     expect(byId.get('camera.lens2')?.device_area_id).toBe('kitchen');
   });
+});
 
 describe('getPresenceSimulationEntities', () => {
   it('returns only loaded switches from the Presence Simulation platform', () => {
