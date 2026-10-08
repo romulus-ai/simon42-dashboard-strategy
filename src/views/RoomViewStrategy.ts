@@ -22,10 +22,12 @@ import {
   applyBadgeGroupOptions,
   isDefaultShowName,
   isEnergyBlockSensor,
+  isWindowContactDeviceClass,
   resolveShowName,
   selectBadgeEntitiesOfType,
   type BadgeCandidate,
 } from '../utils/badge-utils';
+import { isRelayOpeningSensor } from '../utils/entity-filter';
 import { buildCoverControlBadges } from '../utils/cover-controls';
 import { densePlacement } from '../utils/view-builder';
 
@@ -66,17 +68,11 @@ interface UpsDeviceRender {
 }
 
 /** Reflect.get keeps dynamic state lookups off the object-injection radar. */
-function getEntityState(
-  hass: HomeAssistant,
-  entityId: string
-): HassEntity | undefined {
+function getEntityState(hass: HomeAssistant, entityId: string): HassEntity | undefined {
   return Reflect.get(hass.states as Record<string, unknown>, entityId) as HassEntity | undefined;
 }
 
-function getEntityDeviceClass(
-  hass: HomeAssistant,
-  entityId: string
-): string | undefined {
+function getEntityDeviceClass(hass: HomeAssistant, entityId: string): string | undefined {
   return getEntityState(hass, entityId)?.attributes?.device_class as string | undefined;
 }
 
@@ -153,10 +149,7 @@ function getAreasRoomPins(config: RoomPinsConfig, area: AreaRegistryEntry): stri
     const entity = Registry.getEntity(entityId);
     if (!entity) return false;
     if (entity.area_id === area.area_id) return true;
-    if (entity.device_id) {
-      const device = Registry.getDevice(entity.device_id);
-      if (device?.area_id === area.area_id) return true;
-    }
+    if (entity.device_id && Registry.getDeviceAreaId(entity.device_id) === area.area_id) return true;
     return false;
   });
 }
@@ -321,7 +314,13 @@ class Simon42ViewRoomStrategy extends HTMLElement {
       }
       if (domain === 'cover') {
         if (deviceClass === 'curtain') roomEntities.covers_curtain.push(entityId);
-        else if (deviceClass === 'window' || deviceClass === 'door' || deviceClass === 'gate' || deviceClass === 'garage') roomEntities.covers_window.push(entityId);
+        else if (
+          deviceClass === 'window' ||
+          deviceClass === 'door' ||
+          deviceClass === 'gate' ||
+          deviceClass === 'garage'
+        )
+          roomEntities.covers_window.push(entityId);
         else roomEntities.covers.push(entityId);
         continue;
       }
@@ -439,7 +438,11 @@ class Simon42ViewRoomStrategy extends HTMLElement {
           sensorEntities.occupancy.push(entityId);
           continue;
         }
-        if (deviceClass === 'window') {
+        if (isWindowContactDeviceClass(deviceClass)) {
+          // Relay inputs (`opening` + switch on the same device) are no
+          // contacts — same exclusion as the security view, otherwise a
+          // Shelly/SONOFF relay input would surface as a "window" badge.
+          if (isRelayOpeningSensor(deviceClass, entity.device_id)) continue;
           sensorEntities.window.push(entityId);
           continue;
         }
@@ -561,8 +564,10 @@ class Simon42ViewRoomStrategy extends HTMLElement {
     const namesHidden = hasBadgeConfig ? new Set<string>(badgeOpts.names_hidden || []) : null;
 
     const badges: LovelaceBadgeConfig[] = [];
-    if (primaryTemp) badges.push({ type: 'entity', entity: primaryTemp, color: 'red', tap_action: { action: 'more-info' } });
-    if (primaryHumidity) badges.push({ type: 'entity', entity: primaryHumidity, color: 'indigo', tap_action: { action: 'more-info' } });
+    if (primaryTemp)
+      badges.push({ type: 'entity', entity: primaryTemp, color: 'red', tap_action: { action: 'more-info' } });
+    if (primaryHumidity)
+      badges.push({ type: 'entity', entity: primaryHumidity, color: 'indigo', tap_action: { action: 'more-info' } });
     for (const b of filteredCandidates) {
       const showName = resolveShowName(b.entity, !!b.showName, namesVisible, namesHidden);
       badges.push({
@@ -729,7 +734,15 @@ class Simon42ViewRoomStrategy extends HTMLElement {
             if (doorbell) glanceEntities.push({ entity: doorbell });
           }
 
-          cameraCards.push(buildRoomCameraCard(cameraId, stripAreaName(cameraId, area, hass), cameraLiveToggle, firstOfDevice ? glanceEntities : [], isAqara));
+          cameraCards.push(
+            buildRoomCameraCard(
+              cameraId,
+              stripAreaName(cameraId, area, hass),
+              cameraLiveToggle,
+              firstOfDevice ? glanceEntities : [],
+              isAqara
+            )
+          );
         } else {
           cameraCards.push(buildRoomCameraCard(cameraId, stripAreaName(cameraId, area, hass), cameraLiveToggle));
         }
@@ -867,7 +880,13 @@ class Simon42ViewRoomStrategy extends HTMLElement {
     coverSection('covers', roomEntities.covers, localize('room.covers'), 'mdi:window-shutter');
     coverSection('covers_curtain', roomEntities.covers_curtain, localize('room.curtains'), 'mdi:curtains');
 
-    domainSection('covers_window', roomEntities.covers_window, localize('room.windows'), 'mdi:window-open-variant', coverTileConfig);
+    domainSection(
+      'covers_window',
+      roomEntities.covers_window,
+      localize('room.windows'),
+      'mdi:window-open-variant',
+      coverTileConfig
+    );
 
     domainSection('media', roomEntities.media_player, localize('room.media'), 'mdi:speaker', (e) => {
       const state = hass.states[e];
@@ -1008,7 +1027,13 @@ class Simon42ViewRoomStrategy extends HTMLElement {
 
     const roomPins = getAreasRoomPins(dashboardConfig, area);
     if (roomPins.length > 0) {
-      domainSection('room_pins', roomPins, localize('room.room_pins'), 'mdi:pin', buildRoomPinTile(dashboardConfig, area, hass));
+      domainSection(
+        'room_pins',
+        roomPins,
+        localize('room.room_pins'),
+        'mdi:pin',
+        buildRoomPinTile(dashboardConfig, area, hass)
+      );
     }
 
     for (const key of stacksOrder) {
@@ -1022,7 +1047,13 @@ class Simon42ViewRoomStrategy extends HTMLElement {
       `Room ${area.area_id}: ${visibleEntities.length} visible entities, ${sections.length} sections, ${badges.length} badges`
     );
     timeEnd(`room-generate-${area.area_id}`);
-    return { type: 'sections', ...densePlacement(dashboardConfig), header: { badges_position: 'bottom' }, sections, badges };
+    return {
+      type: 'sections',
+      ...densePlacement(dashboardConfig),
+      header: { badges_position: 'bottom' },
+      sections,
+      badges,
+    };
   }
 }
 

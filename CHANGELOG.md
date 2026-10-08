@@ -3,6 +3,45 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 
+## [1.4.2](https://github.com/TheRealSimon42/simon42-dashboard-strategy/compare/v1.4.1...v1.4.2) (2026-10-02)
+
+
+### Features
+
+* **i18n:** add Hungarian translation ([b89c2e1](https://github.com/TheRealSimon42/simon42-dashboard-strategy/commit/b89c2e10adecb0b6a934edb940b55803ce9e8c38))
+* **i18n:** add Polish translation ([e88017f](https://github.com/TheRealSimon42/simon42-dashboard-strategy/commit/e88017f9c122f6b228ccf4e20b39a1465835440f))
+* **maintenance:** ignore selected entities and devices on the maintenance page ([d95d262](https://github.com/TheRealSimon42/simon42-dashboard-strategy/commit/d95d262d3dd4c27b9eb7b103127cda0919c6f0a7)), closes [#395](https://github.com/TheRealSimon42/simon42-dashboard-strategy/issues/395) [#431](https://github.com/TheRealSimon42/simon42-dashboard-strategy/issues/431)
+* optionally hide entities of hidden areas in the lights/covers/climate views and summary counts ([b91e502](https://github.com/TheRealSimon42/simon42-dashboard-strategy/commit/b91e5020267c9ffe65ee3492547ef1a72168905d)), closes [#428](https://github.com/TheRealSimon42/simon42-dashboard-strategy/issues/428) [#433](https://github.com/TheRealSimon42/simon42-dashboard-strategy/issues/433)
+* **rooms:** treat binary sensors with device_class opening as window contacts ([61e2c21](https://github.com/TheRealSimon42/simon42-dashboard-strategy/commit/61e2c21526a03dd44da031ac6ac97fb982943665)), closes [#438](https://github.com/TheRealSimon42/simon42-dashboard-strategy/issues/438)
+* **summary:** optionally hide the maintenance tile when nothing is pending ([6860331](https://github.com/TheRealSimon42/simon42-dashboard-strategy/commit/6860331959c96e8a0345f9f6fc1ae925e43c0278)), closes [#426](https://github.com/TheRealSimon42/simon42-dashboard-strategy/issues/426) [#434](https://github.com/TheRealSimon42/simon42-dashboard-strategy/issues/434)
+* **todos:** hide completed items ([9323dde](https://github.com/TheRealSimon42/simon42-dashboard-strategy/commit/9323dde47b735cd1542a9f2c28df3595bfc4562f))
+* **weather:** hide weather sensors when their value is 0 or off ([e2ad880](https://github.com/TheRealSimon42/simon42-dashboard-strategy/commit/e2ad8802695be4e86400ab37ddc6178a1635d6bc)), closes [#394](https://github.com/TheRealSimon42/simon42-dashboard-strategy/issues/394) [#430](https://github.com/TheRealSimon42/simon42-dashboard-strategy/issues/430)
+
+
+### Bug Fixes
+
+* **i18n:** improve Polish wording ([4d4fc52](https://github.com/TheRealSimon42/simon42-dashboard-strategy/commit/4d4fc5263c5cf3130c242d6e2977fd15a6465686))
+* **maintenance:** keep the "N ignored" hint next to other sections, cover child devices ([161a893](https://github.com/TheRealSimon42/simon42-dashboard-strategy/commit/161a89366be497bd0367c108f1341c7e52b33543))
+
+
+### Documentation
+
+* document the maintenance options and align version markers for 1.4.2 ([d6e0c73](https://github.com/TheRealSimon42/simon42-dashboard-strategy/commit/d6e0c737b7b1bc5a223eb27fc195c9c608cf7901))
+
+## [1.4.1](https://github.com/TheRealSimon42/simon42-dashboard-strategy/compare/v1.4.0...v1.4.1) (2026-09-28)
+
+
+### Bug Fixes
+
+* **covers:** keep moving covers visible ([a42224f](https://github.com/TheRealSimon42/simon42-dashboard-strategy/commit/a42224f4377b8b4ef34af29a31ad02b6a1a72120))
+* **deps:** bump js-yaml from 4.3.1 to 4.3.2 ([bb604e6](https://github.com/TheRealSimon42/simon42-dashboard-strategy/commit/bb604e6d9f0518ecc301757145fee1354bff422a))
+* **editor:** label the motorized-window stack "Fenster (motorisiert)" ([1021a43](https://github.com/TheRealSimon42/simon42-dashboard-strategy/commit/1021a438a49da96929b003114116d5b7389cb1da)), closes [#437](https://github.com/TheRealSimon42/simon42-dashboard-strategy/issues/437)
+* keep auto-hidden sections as an anchor for their assigned custom cards ([d85173d](https://github.com/TheRealSimon42/simon42-dashboard-strategy/commit/d85173d22a300598bf04efa00806e00bdbb86429)), closes [#429](https://github.com/TheRealSimon42/simon42-dashboard-strategy/issues/429)
+* resolve the area of entities on child devices via the parent device (HA 2026.9) ([9b7cdfb](https://github.com/TheRealSimon42/simon42-dashboard-strategy/commit/9b7cdfba52a52794ef04af4ed2dad898512e41dc))
+* show covers with indeterminate (unknown) state in the covers view ([0c06b45](https://github.com/TheRealSimon42/simon42-dashboard-strategy/commit/0c06b459ab2b5f73f7f9c0360c25671bfabcc031)), closes [#439](https://github.com/TheRealSimon42/simon42-dashboard-strategy/issues/439)
+* **summary:** count covers with unknown state as open, matching the covers view ([3d12412](https://github.com/TheRealSimon42/simon42-dashboard-strategy/commit/3d124123dc66014f705967461301dbd970826750))
+* **summary:** do not count idle thermostats as active ([2a84d31](https://github.com/TheRealSimon42/simon42-dashboard-strategy/commit/2a84d317f6001993a4e24c2cd262bc8b81aa3ab6))
+
 ## [1.4.0](https://github.com/TheRealSimon42/simon42-dashboard-strategy/compare/v1.4.0-beta.22...v1.4.0) (2026-08-13)
 
 

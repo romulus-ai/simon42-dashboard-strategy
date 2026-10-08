@@ -7,15 +7,21 @@ import type { LovelaceViewConfig, LovelaceSectionConfig } from '../types/lovelac
 import { Registry } from '../Registry';
 import { localize } from '../utils/localize';
 import { densePlacement } from '../utils/view-builder';
+import { hasState } from '../utils/state-utils';
+import { summaryHiddenAreas } from '../utils/area-utils';
 
 class Simon42ViewClimateStrategy extends HTMLElement {
   static async generate(config: any, hass: HomeAssistant): Promise<LovelaceViewConfig> {
     // Ensure Registry is initialized (idempotent — no-op if already done)
     Registry.initialize(hass, config.config || {});
 
-    const climateIds = Registry.getVisibleEntityIdsForDomain('climate').filter(
-      (id) => hass.states[id] !== undefined
-    );
+    // Hidden overview areas stay in the view unless hide_hidden_areas_in_summaries
+    // is set (#428) — same set the climate summary tile counts
+    const hiddenAreas = summaryHiddenAreas(config.config || {});
+    const climateIds = Registry.getVisibleEntityIdsForDomain(
+      'climate',
+      hiddenAreas ? new Set(hiddenAreas) : undefined
+    ).filter((id) => hasState(hass, id));
 
     // Group by hvac_action or state
     const heating: string[] = [];
@@ -42,11 +48,7 @@ class Simon42ViewClimateStrategy extends HTMLElement {
 
     const sections: LovelaceSectionConfig[] = [];
 
-    const buildSection = (
-      entities: string[],
-      heading: string,
-      icon: string
-    ): void => {
+    function buildSection(entities: string[], heading: string, icon: string): void {
       if (entities.length === 0) return;
       sections.push({
         type: 'grid',
@@ -67,7 +69,7 @@ class Simon42ViewClimateStrategy extends HTMLElement {
           })),
         ],
       });
-    };
+    }
 
     buildSection(heating, localize('climate.heating'), 'mdi:fire');
     buildSection(cooling, localize('climate.cooling'), 'mdi:snowflake');

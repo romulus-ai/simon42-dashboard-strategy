@@ -19,12 +19,16 @@ Eine modulare und hochkonfigurierbare Dashboard-Strategy für Home Assistant, di
 ## Video-Anleitung
 
 <p align="center">
-  <a href="https://youtu.be/XU7DfQrfJ2w">
-    <img src="https://raw.githubusercontent.com/TheRealSimon42/simon42-dashboard-strategy/main/assets/video-thumbnail.png" alt="simon42 Dashboard Strategy — Video Tutorial" width="600" />
+  <a href="https://youtu.be/ANR74_6UY2Y">
+    <img src="https://i.ytimg.com/vi/ANR74_6UY2Y/maxresdefault.jpg" alt="simon42 Dashboard Strategy 1.4 — Video-Anleitung" width="600" />
   </a>
   <br/>
-  <em>Schritt-für-Schritt Anleitung auf YouTube ansehen</em>
+  <em>Einrichtung, die wichtigsten Einstellungen und alle Neuerungen der Version 1.4 auf YouTube ansehen</em>
 </p>
+
+Frühere Videos zur Strategy:
+- [Das große Strategy-Update (April 2026)](https://youtu.be/XU7DfQrfJ2w)
+- [Die Strategy-Vorstellung für Einsteiger](https://youtu.be/Bc1dQFP1HNM)
 
 ---
 
@@ -79,7 +83,7 @@ Wenn dir die simon42 Dashboard Strategy hilft, unterstütze die Weiterentwicklun
 - **Eigene Badges** — Beliebige Badges via YAML im Header (neben Personen-Chips)
 - **Custom Views** — Eigene Dashboard-Views mit beliebigen Cards via YAML
 - **Reaktive Updates** — Echtzeit-Aktualisierung via LitElement Custom Cards
-- **Mehrsprachig** — Deutsch, Englisch und Russisch, automatische Erkennung aus HA-Einstellungen, Fallback auf Englisch
+- **Mehrsprachig** — Deutsch, Englisch, Russisch, Ungarisch und Polnisch, automatische Erkennung aus HA-Einstellungen, Fallback auf Englisch
 - **Performance-optimiert** — Code-Split Bundles, Registry-Caching, Tile-Card-Pooling
 
 > **Versions-Hinweis:** Features ohne Vermerk sind seit v1.3.x oder länger enthalten. Neuere Features tragen ein *(ab vX.Y)* — die vollständige Zuordnung aller Optionen steht in der [Konfigurationsreferenz](#alle-optionen-referenz).
@@ -283,13 +287,15 @@ strategy:
 
 **Bereichs-Verwaltung** — Bereiche ein-/ausblenden, Reihenfolge anpassen, Entitäten pro Bereich und Domain filtern — alles im Editor.
 
+**Was bewirkt „Bereich ausblenden"?** — Ein ausgeblendeter Bereich (`areas_display.hidden`) verliert nur seine Bereichskarte auf der Übersicht und seine Raum-Ansicht. Seine Entitäten bleiben überall sonst erhalten: Die Lichter-, Rollo- und Klima-Ansicht listen sie weiterhin (in der gruppierten Darstellung unter ihrer eigenen Bereichs-Überschrift, nur ohne Link in die nicht vorhandene Raum-Ansicht), die Zähler der Zusammenfassungs-Kacheln rechnen sie mit, und die Sicherheits-Ansicht zeigt Schlösser und Kontakte daraus ebenfalls. So lässt sich z.B. die Abstellkammer von der Übersicht nehmen, ohne dass ihr vergessenes Licht aus der Lichter-Zusammenfassung verschwindet. Wer die Bereiche wirklich komplett heraushalten will, hat dafür zwei getrennte Opt-in-Optionen: `hide_hidden_areas_in_summaries` (Lichter, Rollos, Klima samt Zählern) und `hide_hidden_areas_in_security` (Sicherheits-Ansicht samt Kamera-Karten). Wer einzelne Entitäten überall loswerden will, nimmt das Label `no_dboard` oder den Bereichs-Editor.
+
 **Raum-Pins** — Spezielle Entitäten die in ihren zugeordneten Räumen ganz oben erscheinen. Ideal für Entitäten die nicht automatisch erkannt werden (z.B. Wetterstationen).
 
 **Eigene Sections in Räumen** *(ab v1.4.0)* — Analog zu den eigenen Sections auf der Übersicht lassen sich auch in jeder Raum-Ansicht eigene Section-Blöcke einfügen: im Editor beim jeweiligen Bereich („Eigene Sections in diesem Raum"), mit komplettem Section-Code als YAML (siehe [Eigene Sections](#eigene-sections-ab-v140)) und wählbarer Position — **oberhalb** oder **unterhalb** der automatisch erzeugten Sections. Damit lassen sich z.B. spezielle Karten aus HACS (Versatile Thermostat, Saugroboter-Karten, …) direkt im Raum unterbringen. Tipp: Wer die Standard-Kachel einer Entität ersetzen will, blendet sie in der Domain-Gruppe des Raums aus und fügt die eigene Karte als Section hinzu.
 
 **Automationen & Skripte** — Optional können dem Bereich zugeordnete Automationen und Skripte in den Raum-Views angezeigt werden. Beide Optionen sind separat aktivierbar und standardmäßig aus.
 
-**Fenster- & Türkontakte** — Fensterkontakte und Türkontakte erscheinen als Badges in den Raum-Views (standardmäßig an, per zwei getrennten Toggles im Editor abschaltbar). Absolute Luftfeuchtigkeit (z.B. von der Thermal Comfort Integration, `g/m³`) wird automatisch als Badge erkannt.
+**Fenster- & Türkontakte** — Fensterkontakte und Türkontakte erscheinen als Badges in den Raum-Views (standardmäßig an, per zwei getrennten Toggles im Editor abschaltbar). Generische Öffnungskontakte (`device_class: opening`) zählen dabei als Fensterkontakte *(ab v1.4.2)* — ausgenommen Relais-Geräte, die neben dem Kontakt einen Schalter haben (z.B. Shelly-/SONOFF-Relais mit Eingangskontakt): deren `opening`-Sensor spiegelt nur den Relais-Eingang und bleibt wie in der Sicherheits-Ansicht außen vor. Absolute Luftfeuchtigkeit (z.B. von der Thermal Comfort Integration, `g/m³`) wird automatisch als Badge erkannt.
 
 **Kameras in Räumen** *(ab v1.4.0)* — Kameras in den Raum-Views sind standardmäßig an und können per Toggle deaktiviert werden. Optional (`camera_live_toggle`) startet die Kamera-Karte als Standbild und wechselt erst per **Play/Stopp-Button** in den Live-Stream — das spart Bandbreite und Last auf Wandtablets; Kameras ohne Standbild-Unterstützung (z.B. Aqara) starten dabei automatisch im Live-Modus. Standardmäßig verhalten sich die Kameras wie gewohnt (automatisch aktualisierte Vorschau).
 
@@ -304,6 +310,8 @@ strategy:
 **Aktivitäts-Verlauf in der Sicherheits-Ansicht** *(ab v1.4.0)* — Wie im Home Assistant Security-Panel zeigt ein 24-Stunden-Logbuch die Aktivität aller Sicherheits-Entitäten und Personen. Die Darstellung folgt dem Layout der Ansicht: Im **Kategorien-Modus** (Standard) erscheint der Verlauf als normale Section an erster Stelle (per Checkbox alternativ ans Ende). Im **HA-Style-Modus** (`group_security_by_areas`) stehen alle Bereiche wie im Home Assistant Security-Panel untereinander — nach Etagen gruppiert, Bereichs-Überschriften führen in die Raum-Ansicht — und der Verlauf hängt als Seitenleiste rechts daneben (eigener Tab auf schmalen Bildschirmen). Entitäten mit dem Label **`no_seclog`** bleiben in der Ansicht sichtbar, tauchen aber nicht im Verlauf auf — z.B. innenliegende Türkontakte, deren Historie dort nur Rauschen wäre. Standardmäßig an; entfällt automatisch, wenn die Logbuch-Integration nicht geladen ist, und lässt sich per `show_security_activity: false` abschalten. Einzelne Kameras lassen sich zusätzlich für die **Sicherheits- und Kamera-Ansicht** abwählen (`hidden_cameras`, Checkboxen im Editor) — die Raum-Ansichten bleiben davon unberührt.
 
 **Sicherheits-Ansicht zeigt auch ausgeblendete Bereiche** *(ab v1.4.0)* — Bereiche, die auf der Übersicht ausgeblendet sind (`areas_display.hidden`), erscheinen trotzdem in der Sicherheits-Ansicht: Ein Schloss im ausgeblendeten Treppenhaus bleibt sichtbar — in beiden Layouts, samt Kameras. Im Bereichs-Layout werden solche Bereiche als normale Bereichs-Abschnitte einsortiert (ohne Link in die nicht vorhandene Raum-Ansicht). Wer das alte Verhalten möchte, setzt `hide_hidden_areas_in_security: true` (Checkbox im Editor) — dann werden ausgeblendete Bereiche konsequent aus beiden Sicherheits-Layouts und den Kamera-Karten (Sicherheits- und Kamera-Ansicht) gefiltert. Übersicht und Raum-Ansichten bleiben von der Option unberührt.
+
+**Ausgeblendete Bereiche aus den Zusammenfassungen heraushalten** *(ab v1.4.2, opt-in)* — Standardmäßig zählen und listen die Lichter-, Rollo- und Klima-Ansicht (und ihre Zusammenfassungs-Kacheln) auch Entitäten aus Bereichen, die auf der Übersicht ausgeblendet sind — in der nach Bereichen gruppierten Lichter-/Rollo-Ansicht stehen sie unter ihrer eigenen Bereichs-Überschrift, ohne Link in die nicht vorhandene Raum-Ansicht (wie in der Sicherheits-Ansicht). Mit `hide_hidden_areas_in_summaries: true` (Checkbox im Editor unter „Zusammenfassungen") bleiben diese Bereiche konsequent draußen: in der flachen und der gruppierten Lichter-/Rollo-Ansicht, in der Klima-Ansicht und in den drei Zählern. Die Sicherheits-Ansicht hat ihre eigene Option (`hide_hidden_areas_in_security`); Batterien und Wartung filtern nie nach Bereich — eine leere Batterie in der Abstellkammer bleibt eine leere Batterie.
 
 **Kameras in der Sicherheits-Ansicht** *(ab v1.4.0)* — Mit `show_cameras_in_security` erscheinen die Kameras als kompakte Standbild-Karten in der Sicherheits-Ansicht — dem Vorbild von Home Assistants Security-Panel folgend (dort gehören Kameras zu Alarm, Schlössern und Kontakten). Die Sicherheits-Ansicht erfasst außerdem dieselben Melder-Klassen wie HAs Panel — inklusive Sicherheitsstatus-Sensoren (`safety`, z.B. von Versatile Thermostat), Manipulations- (`tamper`) und CO-Meldern. Einzelne Kameras blendet man wie gewohnt aus (Label `no-dboard` oder die Kamera-Gruppe im Bereichs-Editor — wirkt überall).
 
@@ -442,6 +450,11 @@ strategy:
       icon: mdi:weather-windy
       unit: "km/h"
       round: 1
+    - entity: sensor.rain_rate
+      icon: mdi:weather-rainy
+      unit: "mm/h"
+      round: 1
+      hide_when: zero_or_off   # nur anzeigen, wenn es tatsächlich regnet
 ```
 
 Pro Eintrag:
@@ -449,6 +462,7 @@ Pro Eintrag:
 - `icon` — MDI-Icon (Standard: `mdi:gauge`)
 - `unit` — angehängte Einheit als Text (z.B. `°C`, `km/h`)
 - `round` — Anzahl Nachkommastellen für numerische Werte; weglassen für rohen Zustand
+- `hide_when` — `zero_or_off` blendet den Eintrag live aus, solange sein Wert `0` oder `off` ist (z.B. Regenmenge nur bei Regen); mit `round` zählt der gerundete Anzeigewert, also verschwindet auch `0.04` bei `round: 1`. Sind alle Einträge ausgeblendet, verschwindet die ganze Zeile. Im Editor als Checkbox „Bei 0 oder „aus“ ausblenden“ pro Sensor. Ohne die Option bleibt der Sensor wie bisher immer sichtbar (ab v1.4.2)
 
 #### Custom Views
 
@@ -514,6 +528,7 @@ Die Spalte **Seit** gibt an, ab welcher Version die Option verfügbar ist. „�
 | `show_cameras_in_security` | boolean | `false` | v1.4.0 | Kameras als kompakte Karten in der Sicherheits-Ansicht (Überschrift verlinkt zur Kamera-Ansicht, falls aktiviert) |
 | `group_security_by_areas` | boolean | `false` | v1.4.0 | HA-Style-Layout: alle Bereiche untereinander (nach Etagen), Aktivität als Seitenleiste |
 | `hide_hidden_areas_in_security` | boolean | `false` | v1.4.0 | Ausgeblendete Bereiche (`areas_display.hidden`) auch aus der Sicherheits-Ansicht und den Kamera-Karten filtern; standardmäßig zeigt die Sicherheits-Ansicht alles |
+| `hide_hidden_areas_in_summaries` | boolean | `false` | v1.4.2 | Ausgeblendete Bereiche auch aus Lichter-, Rollo- und Klima-Ansicht sowie deren Zusammenfassungs-Zählern filtern; standardmäßig bleiben ihre Entitäten dort drin |
 | `show_security_activity` | boolean | `true` | v1.4.0 | Aktivitäts-Verlauf (24h-Logbuch) in der Sicherheits-Ansicht; entfällt automatisch ohne Logbuch-Integration |
 | `security_activity_position` | `start` \| `end` | `start` | v1.4.0 | Aktivitäts-Section an erster (Standard) oder letzter Stelle (nur Kategorien-Modus) |
 | `hidden_cameras` | string[] | `[]` | v1.4.0 | Kameras aus Sicherheits- UND Kamera-Ansicht ausblenden (Checkboxen im Editor; Raum-Ansichten unberührt) |
@@ -521,6 +536,13 @@ Die Spalte **Seit** gibt an, ab welcher Version die Option verfügbar ist. „�
 | `show_climate_view` | boolean | `false` | v1.4.0 | Klima-Unterseite (/climate) auch ohne Klima-Zusammenfassung bereitstellen |
 | `show_battery_summary` | boolean | `true` | — | Batterie-Zusammenfassung |
 | `show_battery_view` | boolean | `false` | v1.4.0 | Batterie-Unterseite (/batteries) auch ohne Batterie-Zusammenfassung bereitstellen |
+| `show_maintenance_summary` | boolean | `false` | v1.4.0 | Wartungs-Kachel + Wartungsseite (/maintenance): anstehende Updates, nicht verfügbare Geräte, kritische Batterien, HA-Reparaturen (eingebaute Karte, HA ≥ 2026.3) |
+| `maintenance_visible_users` | string[] | `[]` | v1.4.0 | HA-Benutzer-IDs, die Wartungs-Kachel und Navigations-Tab sehen (leer = alle). Reine Anzeigelogik, kein Zugriffsschutz: die Seite bleibt per URL erreichbar |
+| `show_maintenance_activity` | boolean | `true` | v1.4.0 | Logbuch (24 h) in der Seitenleiste der Wartungsseite, beschränkt auf die dort gezeigten Entitäten; blendet sich ohne Logbuch-Integration oder ohne Befunde aus |
+| `show_video_tips` | boolean | `true` | v1.4.0 | „Expertentipps" in der Seitenleiste der Wartungsseite: passende simon42-Videos zu installierten Integrationen (statische Liste im Bundle, kein Abruf zur Laufzeit) |
+| `maintenance_ignored_entities` | string[] | `[]` | v1.4.2 | Entitäten, die auf der Wartungsseite und in der Wartungs-Kachel nicht als „nicht verfügbar" zählen — z.B. bewusst stromlose Geräte (Suchfeld im Editor). Anstehende Updates und kritische Batterien bleiben unberührt; die Wartungsseite zeigt „N ignoriert" |
+| `maintenance_ignored_devices` | string[] | `[]` | v1.4.2 | Wie `maintenance_ignored_entities`, aber für ganze Geräte inkl. aller ihrer Entitäten (Geräte-IDs; Suchfeld im Editor) |
+| `hide_maintenance_summary_when_ok` | boolean | `false` | v1.4.2 | Wartungs-Kachel (`show_maintenance_summary`) ausblenden, solange nichts ansteht — erscheint beim ersten Eintrag automatisch wieder. Nachbar-Kacheln füllen die Zeile auf; steht die Kachel allein in ihrer Zeile, verschwindet die Zeile komplett |
 | `show_camera_view` | boolean | `false` | v1.4.0 | **Experimentell:** Kamera-Ansicht (/cameras) mit Scheinwerfer, PTZ-Steuerung und Aufnahmen-Link (siehe unten) |
 | `show_camera_events` | boolean | `false` | v1.4.0 | LLM Vision Ereignis-Timelines in der Kamera-Ansicht (Last-Hinweis siehe unten) |
 | `summaries_columns` | 2 \| 4 | `2` | — | Spalten-Layout der Zusammenfassungen |
@@ -545,7 +567,7 @@ Die Spalte **Seit** gibt an, ab welcher Version die Option verfügbar ist. „�
 | `weather_presentation` | string | `forecast_daily` | v1.4.0 | Darstellung: `forecast_daily`, `forecast_hourly`, `forecast_twice_daily`, `tile`, `none` |
 | `show_weather_forecast_card` | boolean | `true` | v1.4.0 | Legacy — durch `weather_presentation` abgelöst, wird weiter berücksichtigt |
 | `show_pollen_card` | boolean | `false` | v1.4.0 | DWD-Pollenflug-Karte unter der Wetterkarte (benötigt die HACS-Integration DWD Pollenflug; Toggle erscheint nur, wenn sie installiert ist) |
-| `weather_sensors` | object[] | `[]` | v1.4.0 | Inline Icon+Wert-Zeile oben in der Wetter-Section (siehe oben) |
+| `weather_sensors` | object[] | `[]` | v1.4.0 | Inline Icon+Wert-Zeile oben in der Wetter-Section (siehe oben); pro Eintrag optional `hide_when: zero_or_off` (ab v1.4.2) |
 | `show_energy` | boolean | `true` | — | Energie-Section |
 | `show_energy_distribution_card` | boolean | `true` | v1.4.0 | Eingebaute `energy-distribution`-Karte. Auf `false` für komplett eigene Energie-Section |
 | `energy_link_dashboard` | boolean | `true` | v1.3.5 | Energie-Karte verlinkt auf das HA-Energie-Dashboard |
@@ -554,6 +576,7 @@ Die Spalte **Seit** gibt an, ab welcher Version die Option verfügbar ist. „�
 | `agenda_calendar_entities` | string[] | alle | v1.4.0 | Kalender für die Agenda einschränken |
 | `show_todos_section` | boolean | `false` | v1.4.0 | To-do-Section |
 | `todos_entities` | string[] | alle | v1.4.0 | To-do-Listen einschränken |
+| `hide_completed_todos` | boolean | `false` | v1.4.2 | Erledigte Einträge in den generierten To-do-Karten ausblenden |
 | `show_persons_section` | boolean | `false` | v1.4.0 | Personen-Section |
 | `show_vacuums_section` | boolean | `false` | v1.4.0 | Staubsauger-/Mähroboter-Section |
 | `show_maintenance_section` | boolean | `false` | v1.4.0 | Wartungs-Section (Updates + niedrige Batterien) |
@@ -615,7 +638,7 @@ Die Spalte **Seit** gibt an, ab welcher Version die Option verfügbar ist. „�
 | `show_scripts_in_rooms` | boolean | `false` | — | Skripte in Raum-Views |
 | `show_cameras_in_rooms` | boolean | `true` | v1.4.0 | Kamera-Streams in Raum-Views |
 | `camera_live_toggle` | boolean | `false` | v1.4.0 | Raum-Kameras als Standbild mit Play/Stopp-Button statt automatischer Vorschau |
-| `show_window_contacts_in_rooms` | boolean | `true` | v1.3.5 | Fensterkontakte als Badges in Raum-Views |
+| `show_window_contacts_in_rooms` | boolean | `true` | v1.3.5 | Fensterkontakte (`device_class: window`, ab v1.4.2 auch `opening`) als Badges in Raum-Views |
 | `show_door_contacts_in_rooms` | boolean | `true` | v1.3.5 | Türkontakte als Badges in Raum-Views |
 | `hide_unavailable_in_rooms` | boolean | `true` | v1.4.0 | Nicht verfügbare Entitäten in Raum-Views ausblenden |
 | `room_visibility` | object | `{}` | v1.4.0 | Raum-Views nur bei bestimmtem Entity-Zustand anzeigen |
@@ -640,7 +663,7 @@ Die Spalte **Seit** gibt an, ab welcher Version die Option verfügbar ist. „�
 
 | Option | Typ | Standard | Seit | Beschreibung |
 |--------|-----|----------|------|-------------|
-| `custom_cards` | object[] | `[]` | — | Eigene Karten via YAML; `target_section` wählt die Ziel-Section (Dropdown im Editor ab v1.4.0) |
+| `custom_cards` | object[] | `[]` | — | Eigene Karten via YAML; `target_section` wählt die Ziel-Section (Dropdown im Editor ab v1.4.0). Ist die Ziel-Section leer (z.B. keine sichtbaren To-do-Listen), bleibt sie ab v1.4.1 als Anker mit Überschrift stehen, damit die zugewiesenen Karten nicht verschwinden; per Schalter deaktivierte Sections bleiben samt Karten ausgeblendet |
 | `custom_cards_heading` | string | `"Eigene Karten"` | — | Überschrift der Custom Cards Section |
 | `custom_cards_icon` | string | `"mdi:cards"` | — | Icon der Custom Cards Section |
 | `custom_sections` | object[] | `[]` | v1.4.0 | Eigene Section-Blöcke auf der Übersicht (Key + kompletter Section-Code als YAML — siehe oben) |
@@ -683,9 +706,11 @@ Die Strategy erkennt automatisch die Sprache aus deinen Home Assistant Einstellu
 |---------|--------|
 | 🇩🇪 Deutsch | Vollständig |
 | 🇬🇧 English | Vollständig |
+| 🇭🇺 Magyar | Vollständig *(ab v1.4.2)* |
+| 🇵🇱 Polski | Vollständig *(ab v1.4.2)* |
 | 🇷🇺 Русский | Vollständig *(ab v1.3.5)* |
 
-**Weitere Sprachen hinzufügen:** Erstelle eine neue Datei `src/translations/<code>.json` (z.B. `fr.json`) nach dem Muster der bestehenden Dateien und öffne einen Pull Request. Der Aufwand ist gering — es müssen nur die Strings übersetzt werden, kein Code.
+**Weitere Sprachen hinzufügen:** Erstelle eine neue Datei `src/translations/<code>.json` (z.B. `fr.json`) nach dem Muster von `en.json`, registriere sie in `src/utils/localize.ts` und `scripts/lint-translations.mjs` und öffne einen Pull Request. Führe anschließend `node scripts/lint-translations.mjs`, Tests und Build aus.
 
 ## Contributing
 

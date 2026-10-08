@@ -25,6 +25,7 @@ import {
 } from '../../src/views/MaintenanceViewStrategy';
 import {
   buildMaintenanceScan,
+  countIgnoredUnavailable,
   countMaintenanceItems,
   haVersionAtLeast,
 } from '../../src/utils/maintenance-utils';
@@ -366,5 +367,141 @@ describe('summary count parity (countMaintenanceItems)', () => {
     const scan = buildMaintenanceScan(hass, {});
     // Threshold 5: the 7% battery is no longer critical
     expect(countMaintenanceItems(hass, scan, 5)).toBe(3);
+  });
+});
+
+describe('maintenance ignore list (#395, opt-in)', () => {
+  it('changes nothing without config (existing dashboards)', () => {
+    const hass = initHass();
+    const scan = buildMaintenanceScan(hass, {});
+    expect(scan.ignoredDeviceGroups).toEqual([]);
+    expect(scan.ignoredOrphanIds).toEqual([]);
+    expect(countIgnoredUnavailable(hass, scan)).toBe(0);
+    expect(cardsOf(buildUnavailableSection(hass, {}))[0].heading).toBe('Unavailable (2)');
+  });
+
+  it('drops ignored devices and entities from the unavailable list and counts them', () => {
+    const hass = initHass();
+    const config = {
+      maintenance_ignored_devices: ['dev_dead'],
+      maintenance_ignored_entities: ['sensor.template_kaputt'],
+    };
+    expect(buildUnavailableSection(hass, config)).toBeNull();
+    const scan = buildMaintenanceScan(hass, config);
+    expect(countIgnoredUnavailable(hass, scan)).toBe(2);
+    // summary tile: only the pending update + the critical battery remain
+    expect(countMaintenanceItems(hass, scan, 20)).toBe(2);
+  });
+
+  it('keeps pending updates and critical batteries untouched', () => {
+    const hass = initHass();
+    const config = { maintenance_ignored_entities: ['update.core', 'sensor.tuer_batterie'] };
+    const updates = cardsOf(buildUpdatesFallbackSection(hass, config)).map(function toEntity(c) { return c.entity; });
+    expect(updates).toContain('update.core');
+    const batteries = cardsOf(buildCriticalBatteriesSection(hass, config)).map(function toEntity(c) { return c.entity; });
+    expect(batteries).toContain('sensor.tuer_batterie');
+  });
+
+  it('shows "N ignored" in the unavailable heading', () => {
+    const hass = initHass();
+    const heading = cardsOf(buildUnavailableSection(hass, { maintenance_ignored_devices: ['dev_dead'] }))[0];
+    expect(heading.heading).toBe('Unavailable (1) · 1 ignored');
+  });
+
+  it('counts only ignored entries that are unavailable right now', () => {
+    const hass = initHass();
+    // light is on, the half-dead device still has a live entity → nothing is swallowed
+    const config = { maintenance_ignored_entities: ['light.wohnzimmer'], maintenance_ignored_devices: ['dev_half'] };
+    expect(countIgnoredUnavailable(hass, buildMaintenanceScan(hass, config))).toBe(0);
+    expect(cardsOf(buildUnavailableSection(hass, config))[0].heading).toBe('Unavailable (2)');
+  });
+
+  it('judges a device on its remaining entities when only one of them is ignored', () => {
+    const hass = initHass();
+    const cards = cardsOf(buildUnavailableSection(hass, { maintenance_ignored_entities: ['sensor.dead_temp'] }));
+    const dead = cards.find(function fromDeadDevice(c) { return c.entity === 'sensor.dead_humidity'; });
+    expect(dead?.name).toBe('Wohnzimmer • Toter Sensor');
+  });
+
+  it('mentions ignored entries on the all-clear card', () => {
+    const hass = initHass({
+      devices: [{ id: 'dev_dead', name: 'Toter Sensor' }],
+      entities: [{ entity_id: 'sensor.dead_temp', device_id: 'dev_dead', state: 'unavailable' }],
+    });
+    const view = buildMaintenanceView(hass, { maintenance_ignored_devices: ['dev_dead'] });
+    const first = view.sections?.[0]?.cards?.[0];
+    expect(first?.type).toBe('markdown');
+    expect(first?.content).toContain('✅');
+    expect(first?.content).toContain('1 ignored');
+  });
+
+  it('keeps the "N ignored" hint when other maintenance sections exist', () => {
+    // Critical battery present, the only unavailable device is ignored →
+    // no all-clear card, so the hint must surface as a heading.
+    const hass = initHass({
+      areas: [{ area_id: 'wohnzimmer', name: 'Wohnzimmer' }],
+      devices: [{ id: 'dev_dead', area_id: 'wohnzimmer', name: 'Toter Sensor' }],
+      entities: [
+        { entity_id: 'sensor.dead_temp', device_id: 'dev_dead', state: 'unavailable' },
+        { entity_id: 'sensor.tuer_batterie', state: '7', attributes: { device_class: 'battery', unit_of_measurement: '%' } },
+      ],
+    });
+    const view = buildMaintenanceView(hass, { maintenance_ignored_devices: ['dev_dead'] });
+    const headings = (view.sections ?? []).map(function firstHeading(section) {
+      return section.cards?.[0]?.heading;
+    });
+    expect(headings).toContain('Unavailable (0) · 1 ignored');
+    // and no all-clear card next to real content
+    const hasAllClear = (view.sections ?? []).some(function isAllClear(section) {
+      return section.cards?.some(function isMarkdown(c) { return c.type === 'markdown' && String(c.content).includes('✅'); });
+    });
+    expect(hasAllClear).toBe(false);
+  });
+
+  it('adds no hint heading when nothing is ignored', () => {
+    const hass = initHass({
+      entities: [
+        { entity_id: 'sensor.tuer_batterie', state: '7', attributes: { device_class: 'battery', unit_of_measurement: '%' } },
+      ],
+    });
+    const view = buildMaintenanceView(hass, {});
+    const headings = (view.sections ?? []).map(function firstHeading(section) {
+      return String(section.cards?.[0]?.heading ?? '');
+    });
+    expect(headings.some(function mentionsUnavailable(h) { return h.startsWith('Unavailable'); })).toBe(false);
+  });
+
+  it('covers the child devices of an ignored device (HA 2026.9+)', () => {
+    const hass = initHass({
+      devices: [
+        { id: 'cam', name: 'Kamera' },
+        { id: 'cam_lens2', name: 'Linse 2', parent_device_id: 'cam' },
+      ],
+      entities: [
+        { entity_id: 'camera.lens1', device_id: 'cam', state: 'unavailable' },
+        { entity_id: 'camera.lens2', device_id: 'cam_lens2', state: 'unavailable' },
+      ],
+    });
+    const config = { maintenance_ignored_devices: ['cam'] };
+    expect(buildUnavailableSection(hass, config)).toBeNull();
+    expect(countIgnoredUnavailable(hass, buildMaintenanceScan(hass, config))).toBe(2);
+    // without the ignore list both devices are listed
+    expect(cardsOf(buildUnavailableSection(hass, {}))[0].heading).toBe('Unavailable (2)');
+  });
+
+  it('scopes the activity log without the ignored entries', () => {
+    const hass = initHass({ ...maintenanceSpec(), components: ['logbook'] });
+    const config = {
+      maintenance_ignored_devices: ['dev_dead'],
+      maintenance_ignored_entities: ['sensor.template_kaputt'],
+    };
+    const logbook = cardsOf(buildMaintenanceActivitySection(hass, config)).find(function isLogbook(c) {
+      return c.type === 'logbook';
+    });
+    const ids: string[] = logbook?.target?.entity_id ?? [];
+    expect(ids).toContain('update.core');
+    expect(ids).toContain('sensor.tuer_batterie');
+    expect(ids).not.toContain('sensor.dead_temp');
+    expect(ids).not.toContain('sensor.template_kaputt');
   });
 });

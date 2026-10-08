@@ -30,6 +30,7 @@ import {
   pendingUpdateIds,
   listUnavailableBlocks,
   criticalBatteryIds,
+  countIgnoredUnavailable,
   haVersionAtLeast,
 } from '../utils/maintenance-utils';
 import { matchVideoTips, readDismissedTips } from '../utils/video-tips';
@@ -44,6 +45,17 @@ function hacsHintCard(hass: HomeAssistant): LovelaceCardConfig | null {
     type: 'markdown',
     content: `🧩 ${localize('maintenance.hacs_hint')}\n\n[${localize('maintenance.hacs_open')}](/hacs)`,
   };
+}
+
+/**
+ * " · N ignored" suffix for the unavailable heading and the all-clear
+ * card: ignored entries (maintenance_ignored_*) that are unavailable
+ * right now. Empty when nothing is being filtered, so dashboards without
+ * an ignore list render exactly as before.
+ */
+function ignoredHint(count: number): string {
+  if (count === 0) return '';
+  return ` · ${localize('maintenance.ignored').replace('{count}', String(count))}`;
 }
 
 /**
@@ -192,11 +204,12 @@ export function buildUnavailableSection(
   const scan = buildMaintenanceScan(hass, config);
   const blocks = listUnavailableBlocks(hass, scan);
   if (blocks.length === 0) return null;
+  const ignored = ignoredHint(countIgnoredUnavailable(hass, scan));
 
   const cards: LovelaceCardConfig[] = [
     {
       type: 'heading',
-      heading: `${localize('maintenance.unavailable')} (${blocks.length})`,
+      heading: `${localize('maintenance.unavailable')} (${blocks.length})${ignored}`,
       heading_style: 'title',
       icon: 'mdi:lan-disconnect',
     },
@@ -241,9 +254,7 @@ export function buildCriticalBatteriesSection(
       heading: `${localize('maintenance.batteries_critical')} (${critical.length})`,
       heading_style: 'title',
       icon: 'mdi:battery-alert',
-      ...(batteriesViewExists
-        ? { tap_action: { action: 'navigate', navigation_path: 'batteries' } }
-        : {}),
+      ...(batteriesViewExists ? { tap_action: { action: 'navigate', navigation_path: 'batteries' } } : {}),
     },
   ];
 
@@ -294,10 +305,7 @@ export function buildVideoTipsSection(
   return { type: 'grid', cards };
 }
 
-export function buildMaintenanceView(
-  hass: HomeAssistant,
-  config: Simon42StrategyConfig
-): LovelaceViewConfig {
+export function buildMaintenanceView(hass: HomeAssistant, config: Simon42StrategyConfig): LovelaceViewConfig {
   const sidebar = buildMaintenanceSidebar(hass, config);
   const sections: LovelaceSectionConfig[] = [];
 
@@ -313,17 +321,41 @@ export function buildMaintenanceView(
 
   // Unavailable devices deliberately LAST — usually the longest list
   const unavailableSection = buildUnavailableSection(hass, config);
-  if (unavailableSection) sections.push(unavailableSection);
+  if (unavailableSection) {
+    sections.push(unavailableSection);
+  } else if (sections.length > 0) {
+    // Nothing unavailable is listed, but other maintenance content exists:
+    // the all-clear card (which carries the "N ignored" hint) won't render,
+    // so keep the hint as a heading — the list may be empty only because of
+    // the ignore list.
+    const ignored = countIgnoredUnavailable(hass, buildMaintenanceScan(hass, config));
+    if (ignored > 0) {
+      sections.push({
+        type: 'grid',
+        cards: [
+          {
+            type: 'heading',
+            heading: `${localize('maintenance.unavailable')} (0)${ignoredHint(ignored)}`,
+            heading_style: 'title',
+            icon: 'mdi:lan-disconnect',
+          },
+        ],
+      });
+    }
+  }
 
   // All clear? Friendly empty state instead of a blank main column.
-  // Video tips don't count as maintenance content here.
+  // Video tips don't count as maintenance content here. Ignored entries
+  // that are unavailable right now stay visible as a count — the page
+  // may be clean only because of the ignore list.
   if (sections.length === 0) {
+    const ignored = countIgnoredUnavailable(hass, buildMaintenanceScan(hass, config));
     sections.push({
       type: 'grid',
       cards: [
         {
           type: 'markdown',
-          content: `✅ ${localize('maintenance.all_ok')}`,
+          content: `✅ ${localize('maintenance.all_ok')}${ignoredHint(ignored)}`,
         },
       ],
     });

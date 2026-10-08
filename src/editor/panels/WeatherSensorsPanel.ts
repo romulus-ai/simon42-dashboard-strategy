@@ -3,8 +3,9 @@
 // ====================================================================
 // Per-row structured editor for the `weather_sensors` config array.
 // Each row binds to a WeatherSensorConfig and exposes inline inputs for
-// icon / unit / round. Adding a row uses the same entity-search picker
-// pattern as favorites; removal is a single-click button.
+// icon / unit / round plus a "hide when 0 / off" checkbox (`hide_when`).
+// Adding a row uses the same entity-search picker pattern as favorites;
+// removal is a single-click button.
 //
 // The picker filters to numeric-ish sensors by default but does not hard-
 // restrict — any entity domain is accepted (the markdown row in the
@@ -39,11 +40,12 @@ export function renderWeatherSensorsSection(host: StrategyEditorHost): TemplateR
       </div>
 
       <div id="weather-sensors-list" style="margin-bottom: 12px;">
-        ${sensors.length === 0
-          ? html`<div class="empty-state">${localize('editor.no_weather_sensors')}</div>`
-          : sensors.map((sensor, index) => {
-              const name = entityMap.get(sensor.entity) || sensor.entity;
-              return html`
+        ${
+          sensors.length === 0
+            ? html`<div class="empty-state">${localize('editor.no_weather_sensors')}</div>`
+            : sensors.map((sensor, index) => {
+                const name = entityMap.get(sensor.entity) || sensor.entity;
+                return html`
                 <div class="custom-item" data-sensor-index=${index}>
                   <div class="custom-item-header">
                     <strong>
@@ -69,32 +71,59 @@ export function renderWeatherSensorsSection(host: StrategyEditorHost): TemplateR
                         .value=${sensor.round !== undefined ? String(sensor.round) : ''}
                         @change=${(e: Event) => updateWeatherSensor(host, index, 'round', (e.target as HTMLInputElement).value)} />
                     </div>
+                    <div class="form-row" style="margin-bottom: 0;">
+                      <input type="checkbox" id="weather-sensor-hide-zero-off-${index}"
+                        .checked=${sensor.hide_when === 'zero_or_off'}
+                        @change=${(e: Event) => updateWeatherSensor(host, index, 'hide_when', (e.target as HTMLInputElement).checked ? 'zero_or_off' : '')} />
+                      <label for="weather-sensor-hide-zero-off-${index}">${localize('editor.weather_sensors_hide_zero_off')}</label>
+                    </div>
                   </div>
                 </div>
               `;
-            })}
+              })
+        }
       </div>
 
       <div class="entity-search-picker">
         <input type="text" class="entity-search-input"
           placeholder=${localize('editor.weather_sensors_add')}
           .value=${host._weatherSensorSearch}
-          @input=${(e: Event) => { host._weatherSensorSearch = (e.target as HTMLInputElement).value; host.requestUpdate(); }}
-          @blur=${() => { setTimeout(() => { host._weatherSensorSearch = ''; host.requestUpdate(); }, 200); }}
+          @input=${(e: Event) => {
+            host._weatherSensorSearch = (e.target as HTMLInputElement).value;
+            host.requestUpdate();
+          }}
+          @blur=${() => {
+            setTimeout(() => {
+              host._weatherSensorSearch = '';
+              host.requestUpdate();
+            }, 200);
+          }}
         />
-        ${host._weatherSensorSearch.length >= 2 ? html`
+        ${
+          host._weatherSensorSearch.length >= 2
+            ? html`
           <div class="entity-search-results">
-            ${filteredEntities.length > 0
-              ? filteredEntities.map((entity) => html`
-                <div class="entity-search-result" @mousedown=${(e: Event) => { e.preventDefault(); addWeatherSensor(host, entity.entity_id); host._weatherSensorSearch = ''; host.requestUpdate(); }}>
+            ${
+              filteredEntities.length > 0
+                ? filteredEntities.map(
+                    (entity) => html`
+                <div class="entity-search-result" @mousedown=${(e: Event) => {
+                  e.preventDefault();
+                  addWeatherSensor(host, entity.entity_id);
+                  host._weatherSensorSearch = '';
+                  host.requestUpdate();
+                }}>
                   <span class="entity-search-name">${entity.name}</span>
                   <span class="entity-search-id">${entity.entity_id}</span>
                 </div>
-              `)
-              : html`<div class="entity-search-no-results">${localize('editor.no_results')}</div>`
+              `
+                  )
+                : html`<div class="entity-search-no-results">${localize('editor.no_results')}</div>`
             }
           </div>
-        ` : nothing}
+        `
+            : nothing
+        }
       </div>
   `;
 }
@@ -155,7 +184,7 @@ const ICON_RE = /^[a-z]+:[a-z0-9-]+$/;
  */
 function inferWeatherSensorDefaults(
   host: StrategyEditorHost,
-  entityId: string,
+  entityId: string
 ): { icon?: string; unit?: string; round?: number } {
   const state = host._hass ? stateFor(host._hass, entityId) : undefined;
   const attrs = (state?.attributes || {}) as Record<string, unknown>;
@@ -220,7 +249,7 @@ function updateWeatherSensor(
   host: StrategyEditorHost,
   index: number,
   field: keyof WeatherSensorConfig,
-  rawValue: string,
+  rawValue: string
 ): void {
   const current = host._config.weather_sensors || [];
   if (index < 0 || index >= current.length) return;
@@ -241,6 +270,10 @@ function updateWeatherSensor(
   } else if (field === 'unit') {
     if (trimmed === '') delete target.unit;
     else target.unit = trimmed;
+  } else if (field === 'hide_when') {
+    // Checkbox: only the single supported mode is stored; unchecked drops the key
+    if (trimmed === 'zero_or_off') target.hide_when = 'zero_or_off';
+    else delete target.hide_when;
   } else {
     // remaining field is 'entity' — read-only via this method; ignore
     return;

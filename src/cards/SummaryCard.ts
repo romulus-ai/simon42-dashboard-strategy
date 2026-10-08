@@ -7,11 +7,20 @@ import type { HomeAssistant, HassEntity } from '../types/homeassistant';
 import { Registry } from '../Registry';
 import { trackHassUpdate, debugLog, timeStart, timeEnd } from '../utils/debug';
 import { localize } from '../utils/localize';
-import { getBatteryEntities, SECURITY_EXCLUDED_PLATFORMS } from '../utils/entity-filter';
+import { getBatteryEntities, isRelayOpeningSensor, SECURITY_EXCLUDED_PLATFORMS } from '../utils/entity-filter';
 import { isEntityCurrentlyAvailable } from '../utils/availability-utils';
 import { buildMaintenanceScan, countMaintenanceItems, type MaintenanceScan } from '../utils/maintenance-utils';
+import { countActiveClimateEntities } from '../utils/summary-view-utils';
 
 type SummaryType = 'lights' | 'covers' | 'security' | 'batteries' | 'climate' | 'maintenance';
+
+// Cover states the covers view can bucket on directly; anything else that is
+// not "unavailable" (chiefly "unknown") is indeterminate and shown as open.
+const KNOWN_COVER_STATES = new Set(['open', 'opening', 'closing', 'closed']);
+
+function isIndeterminateCoverState(state: string | undefined): boolean {
+  return state !== undefined && state !== 'unavailable' && !KNOWN_COVER_STATES.has(state);
+}
 
 interface SummaryCardConfig {
   summary_type: SummaryType;
@@ -19,6 +28,18 @@ interface SummaryCardConfig {
   hide_battery_notes_entities?: boolean;
   battery_critical_threshold?: number;
   hide_unavailable_entities?: boolean;
+  // maintenance type only: ignore list for the unavailable scan (#395)
+  maintenance_ignored_entities?: string[];
+  maintenance_ignored_devices?: string[];
+  // opt-in (#426): hide the tile while its count is 0 — the strategy sets
+  // this for the maintenance tile only (hide_maintenance_summary_when_ok)
+  hide_when_ok?: boolean;
+  /** Areas whose entities the lights/covers/climate counts leave out (set by
+   *  the overview from areas_display.hidden with hide_hidden_areas_in_summaries,
+   *  #428). Unset = count every visible entity, whatever its area. The security
+   *  count follows hide_hidden_areas_in_security instead; batteries and
+   *  maintenance never filter by area. */
+  hidden_areas?: string[];
 }
 
 interface DisplayConfig {
@@ -31,7 +52,16 @@ interface DisplayConfig {
 const COVER_DEVICE_CLASSES = new Set(['awning', 'blind', 'curtain', 'shade', 'shutter', 'window']);
 
 const SECURITY_COVER_CLASSES = new Set(['door', 'garage', 'gate', 'window']);
-const SECURITY_BINARY_SENSOR_CLASSES = new Set(['door', 'window', 'garage_door', 'opening', 'smoke', 'gas', 'heat', 'moisture']);
+const SECURITY_BINARY_SENSOR_CLASSES = new Set([
+  'door',
+  'window',
+  'garage_door',
+  'opening',
+  'smoke',
+  'gas',
+  'heat',
+  'moisture',
+]);
 
 const COLOR_MAP: Record<string, string> = {
   orange: 'var(--orange-color, #ff9800)',
@@ -59,6 +89,9 @@ class Simon42SummaryCard extends LitElement {
     :host {
       display: block;
       cursor: pointer;
+    }
+    :host([hidden]) {
+      display: none;
     }
     ha-card {
       padding: 12px;
@@ -112,6 +145,27 @@ class Simon42SummaryCard extends LitElement {
     if (this._count !== newCount) {
       this._count = newCount;
     }
+    this._applyHideWhenOk(newCount);
+  }
+
+  /**
+   * Opt-in self-hide (#426) via HA's own contract for cards that hide
+   * themselves (hui-conditional-card does the same): toggle the `hidden`
+   * attribute and notify the hui-card wrapper with `card-visibility-changed`,
+   * which then hides itself — inside a horizontal-stack the sibling tiles
+   * fill the row, as a standalone grid card the section drops it from the
+   * grid. The wrapper keeps feeding `hass` while we are hidden (Lit updates
+   * detached elements too), so the tile returns on its own with the first
+   * pending item. Pure comparison on the already computed count — no extra
+   * entity scan per update.
+   */
+  private _applyHideWhenOk(count: number): void {
+    const hide = this._config.hide_when_ok === true && count === 0;
+    if (this.hidden === hide) return;
+    this.hidden = hide;
+    this.dispatchEvent(
+      new CustomEvent('card-visibility-changed', { bubbles: true, composed: true, detail: { value: !hide } })
+    );
   }
 
   private _isEntityRelevant(id: string, _state: HassEntity): boolean {
@@ -125,17 +179,20 @@ class Simon42SummaryCard extends LitElement {
     const type = this._config.summary_type;
     timeStart(`summary-getRelevant-${type}`);
     const hass = this.hass;
+    // Only lights/covers/climate honour hidden_areas — built once per cache
+    // rebuild, never per hass update.
+    const hiddenAreas = this._hiddenAreaSet();
     let result: string[];
 
     switch (this._config.summary_type) {
       case 'lights':
-        result = Registry.getVisibleEntityIdsForDomain('light').filter(
+        result = Registry.getVisibleEntityIdsForDomain('light', hiddenAreas).filter(
           (id) => hass.states[id] && this._isEntityRelevant(id, hass.states[id])
         );
         break;
 
       case 'covers':
-        result = Registry.getVisibleEntityIdsForDomain('cover').filter((id) => {
+        result = Registry.getVisibleEntityIdsForDomain('cover', hiddenAreas).filter((id) => {
           const state = hass.states[id];
           if (!state) return false;
           if (!this._isEntityRelevant(id, state)) return false;
@@ -171,13 +228,10 @@ class Simon42SummaryCard extends LitElement {
           if (entry?.platform && SECURITY_EXCLUDED_PLATFORMS.has(entry.platform)) continue;
           const deviceClass = state.attributes?.device_class;
           if (deviceClass === undefined || !SECURITY_BINARY_SENSOR_CLASSES.has(deviceClass)) continue;
-          // Skip relay-style devices that expose an `opening` binary_sensor
-          // alongside their primary switch (e.g. SONOFF ZBMINIR2/L2). The
-          // "opening" state mirrors the relay, not a door/window contact.
-          if (deviceClass === 'opening' && entry?.device_id) {
-            const siblings = Registry.getEntityIdsForDevice(entry.device_id);
-            if (siblings.some((sid) => sid.startsWith('switch.'))) continue;
-          }
+          // Relay-style devices (switch sibling) expose an `opening` sensor
+          // that mirrors the relay, not a contact — shared heuristic with
+          // the security view and the room badges.
+          if (isRelayOpeningSensor(deviceClass, entry?.device_id)) continue;
           result.push(id);
         }
         break;
@@ -189,7 +243,7 @@ class Simon42SummaryCard extends LitElement {
       }
 
       case 'climate':
-        result = Registry.getVisibleEntityIdsForDomain('climate').filter(
+        result = Registry.getVisibleEntityIdsForDomain('climate', hiddenAreas).filter(
           (id) => hass.states[id] && this._isEntityRelevant(id, hass.states[id])
         );
         break;
@@ -209,6 +263,12 @@ class Simon42SummaryCard extends LitElement {
     this._relevantEntityIds = new Set(result);
     debugLog(`summary-${type}: ${result.length} relevant entities`);
     timeEnd(`summary-getRelevant-${type}`);
+  }
+
+  /** hidden_areas as a Set — undefined when the tile excludes no area. */
+  private _hiddenAreaSet(): Set<string> | undefined {
+    const hidden = this._config.hidden_areas;
+    return Array.isArray(hidden) && hidden.length > 0 ? new Set(hidden) : undefined;
   }
 
   private _calculateCount(): number {
@@ -241,7 +301,10 @@ class Simon42SummaryCard extends LitElement {
         for (const id of this._relevantEntityIds) {
           if (!isEntityCurrentlyAvailable(hass, id, this._config)) continue;
           const s = hass.states[id]?.state;
-          if (s === 'open' || s === 'opening') count++;
+          // Feedback-less covers (state "unknown", e.g. Somfy io remotes without
+          // position sensors) are listed under "open" in the covers view
+          // (#439 / #454) — count them the same way so the tile matches the view.
+          if (s === 'open' || s === 'opening' || isIndeterminateCoverState(s)) count++;
         }
         return count;
 
@@ -282,12 +345,7 @@ class Simon42SummaryCard extends LitElement {
       }
 
       case 'climate':
-        for (const id of this._relevantEntityIds) {
-          if (!isEntityCurrentlyAvailable(hass, id, this._config)) continue;
-          const s = hass.states[id]?.state;
-          if (s && s !== 'off' && s !== 'unavailable' && s !== 'unknown') count++;
-        }
-        return count;
+        return countActiveClimateEntities(hass, this._relevantEntityIds, this._config);
 
       default:
         return 0;
@@ -301,13 +359,17 @@ class Simon42SummaryCard extends LitElement {
     const configs: Record<SummaryType, DisplayConfig> = {
       lights: {
         icon: 'mdi:lamps',
-        name: hasItems ? `${count} ${count === 1 ? localize('summary.lights_on_one') : localize('summary.lights_on_many')}` : localize('summary.lights_off'),
+        name: hasItems
+          ? `${count} ${count === 1 ? localize('summary.lights_on_one') : localize('summary.lights_on_many')}`
+          : localize('summary.lights_off'),
         color: hasItems ? 'orange' : 'grey',
         path: 'lights',
       },
       covers: {
         icon: 'mdi:blinds-horizontal',
-        name: hasItems ? `${count} ${count === 1 ? localize('summary.covers_open_one') : localize('summary.covers_open_many')}` : localize('summary.covers_closed'),
+        name: hasItems
+          ? `${count} ${count === 1 ? localize('summary.covers_open_one') : localize('summary.covers_open_many')}`
+          : localize('summary.covers_closed'),
         color: hasItems ? 'purple' : 'grey',
         path: 'covers',
       },
@@ -319,19 +381,25 @@ class Simon42SummaryCard extends LitElement {
       },
       batteries: {
         icon: hasItems ? 'mdi:battery-alert' : 'mdi:battery-charging',
-        name: hasItems ? `${count} ${count === 1 ? localize('summary.batteries_critical_one') : localize('summary.batteries_critical_many')}` : localize('summary.batteries_ok'),
+        name: hasItems
+          ? `${count} ${count === 1 ? localize('summary.batteries_critical_one') : localize('summary.batteries_critical_many')}`
+          : localize('summary.batteries_ok'),
         color: hasItems ? 'red' : 'grey',
         path: 'batteries',
       },
       climate: {
         icon: 'mdi:thermostat',
-        name: hasItems ? `${count} ${count === 1 ? localize('summary.climate_active_one') : localize('summary.climate_active_many')}` : localize('summary.climate_off'),
+        name: hasItems
+          ? `${count} ${count === 1 ? localize('summary.climate_active_one') : localize('summary.climate_active_many')}`
+          : localize('summary.climate_off'),
         color: hasItems ? 'orange' : 'grey',
         path: 'climate',
       },
       maintenance: {
         icon: 'mdi:wrench',
-        name: hasItems ? `${count} ${count === 1 ? localize('summary.maintenance_pending_one') : localize('summary.maintenance_pending_many')}` : localize('summary.maintenance_ok'),
+        name: hasItems
+          ? `${count} ${count === 1 ? localize('summary.maintenance_pending_one') : localize('summary.maintenance_pending_many')}`
+          : localize('summary.maintenance_ok'),
         color: hasItems ? 'orange' : 'grey',
         path: 'maintenance',
       },
@@ -361,7 +429,6 @@ class Simon42SummaryCard extends LitElement {
   }
 
   protected render() {
-
     const display = this._getDisplayConfig();
     const colorCss = COLOR_MAP[display.color] || COLOR_MAP.grey;
 

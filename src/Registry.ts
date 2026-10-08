@@ -20,6 +20,7 @@ import type {
 import type { Simon42StrategyConfig } from './types/strategy';
 import { timeStart, timeEnd, debugLog } from './utils/debug';
 import { setupLocalize } from './utils/localize';
+import { getEffectiveDeviceAreaId } from './utils/device-utils';
 
 /**
  * Static singleton registry that holds all HA registry data and provides
@@ -61,7 +62,7 @@ class Registry {
   /** Entity IDs grouped by device_id */
   private static _entitiesByDevice: Map<string, string[]>;
 
-  /** Entity registry entries grouped by resolved area_id (entity.area_id || device.area_id) */
+  /** Entity registry entries grouped by resolved area_id (entity.area_id || effective device area, see getDeviceAreaId) */
   private static _entitiesByArea: Map<string, EntityRegistryEntry[]>;
 
   /** Entity IDs grouped by domain prefix (e.g. "light", "sensor") */
@@ -270,7 +271,7 @@ class Registry {
     Registry._configDiagEntitiesByArea = new Map();
 
     for (const e of entities) {
-      const areaId = e.area_id || (e.device_id ? Registry._deviceById.get(e.device_id)?.area_id : undefined);
+      const areaId = e.area_id || (e.device_id ? Registry.getDeviceAreaId(e.device_id) : undefined);
       if (!areaId) continue;
 
       // Raw map (all entities in area)
@@ -399,9 +400,41 @@ class Registry {
   /**
    * Get visible entity IDs for a domain. O(1).
    * Pre-filtered: no hidden, no_dboard, config/diagnostic, config-hidden.
+   *
+   * With `excludeAreas`, entities resolving to one of those areas (own
+   * area_id or the effective device area, see getAreaIdForEntity) are left
+   * out — an O(n) pass over the domain list, so call it where the entity
+   * list is built once (cache build), not per render. The caller decides
+   * which areas to exclude (e.g. areas_display.hidden with the opt-in
+   * hide_hidden_areas_in_summaries, #428) — deliberately not read from the
+   * Registry config: like the security view (#410), the set comes from the
+   * config the caller was generated with. Without the parameter (or with an
+   * empty set) the pre-computed list is returned unchanged.
    */
-  static getVisibleEntityIdsForDomain(domain: string): string[] {
-    return Registry._visibleEntitiesByDomain.get(domain) || [];
+  static getVisibleEntityIdsForDomain(domain: string, excludeAreas?: ReadonlySet<string>): string[] {
+    const ids = Registry._visibleEntitiesByDomain.get(domain) || [];
+    if (!excludeAreas || excludeAreas.size === 0) return ids;
+    return ids.filter(function notInExcludedArea(id) {
+      return !Registry.isEntityInAreas(id, excludeAreas);
+    });
+  }
+
+  /**
+   * Resolve an entity's area: its own area_id, else the effective area of
+   * its device (child devices inherit the parent's area, HA 2026.9+).
+   * null when the entity is unknown or has no area.
+   */
+  static getAreaIdForEntity(entityId: string): string | null {
+    const entry = Registry._entityById.get(entityId);
+    if (!entry) return null;
+    if (entry.area_id) return entry.area_id;
+    return entry.device_id ? Registry.getDeviceAreaId(entry.device_id) : null;
+  }
+
+  /** Whether the entity resolves to one of the given areas. Area-less entities never match. */
+  static isEntityInAreas(entityId: string, areaIds: ReadonlySet<string>): boolean {
+    const areaId = Registry.getAreaIdForEntity(entityId);
+    return areaId !== null && areaIds.has(areaId);
   }
 
   /**
@@ -427,6 +460,17 @@ class Registry {
   /** Get device registry entry by device id. O(1). */
   static getDevice(deviceId: string): DeviceRegistryEntry | undefined {
     return Registry._deviceById.get(deviceId);
+  }
+
+  /**
+   * Effective area of a device: its own area or, for child devices
+   * (HA 2026.9+, `parent_device_id`), the parent's area. Always use this
+   * instead of `getDevice(id)?.area_id` when resolving entity areas.
+   */
+  static getDeviceAreaId(deviceId: string): string | null {
+    return getEffectiveDeviceAreaId(Registry._deviceById.get(deviceId), function lookup(id: string) {
+      return Registry._deviceById.get(id);
+    });
   }
 
   // =====================================================================

@@ -155,10 +155,22 @@ export interface Simon42StrategyConfig {
   show_maintenance_summary?: boolean; // default: false — admin-flavoured
   // "Wartung" summary tile + /maintenance view: pending updates, unavailable
   // devices, critical batteries, HA repairs (built-in card, HA >= 2026.3)
+  hide_maintenance_summary_when_ok?: boolean; // default: false — opt-in
+  // (#426): the maintenance tile hides itself while it has nothing to report
+  // and comes back with the first pending item. Off by default so the 2/4-
+  // column summary rows keep their shape
   maintenance_visible_users?: string[]; // default: [] = everyone. HA user ids
   // that see the maintenance tile + nav tab (native Lovelace user condition).
   // Display logic only — NOT a security boundary; the view stays reachable
   // by URL for everyone
+  maintenance_ignored_entities?: string[]; // default: [] — entity ids the
+  // maintenance tile + view skip when scanning for UNAVAILABLE entities
+  // (deliberately powered-off devices, seasonal hardware, …). Pending
+  // updates and critical batteries are unaffected. Ignored entries that
+  // are unavailable right now are counted and shown as "N ignored" so
+  // real outages never vanish silently (#395)
+  maintenance_ignored_devices?: string[]; // default: [] — same for whole
+  // devices (device ids; covers every entity of the device)
   show_maintenance_activity?: boolean; // default: true — logbook (24h) in
   // the maintenance view sidebar, scoped to exactly the entities the view
   // surfaces (pending updates, unavailable devices, critical batteries);
@@ -192,6 +204,15 @@ export interface Simon42StrategyConfig {
   // hidden areas out of BOTH security layouts AND the camera blocks
   // (security + CCTV view). Room views and the overview stay unaffected
   // either way
+  hide_hidden_areas_in_summaries?: boolean; // default: false — hiding an
+  // area on the overview only removes its area card; its lights, covers and
+  // thermostats stay in the lights/covers/climate views and in the summary
+  // tile counts (some users hide a storeroom card but still want its light
+  // counted, #428). true = leave those areas out there as well — flat and
+  // area-grouped lights/covers views, the climate view and the three tile
+  // counts. Security keeps its own hide_hidden_areas_in_security; batteries
+  // and maintenance are untouched (a low battery in a hidden area is still
+  // a maintenance fact)
   show_security_activity?: boolean; // default: true — activity log in the
   // security view (24h logbook over security entities + persons, like
   // HA's security panel); auto-hides when logbook is not loaded
@@ -285,6 +306,8 @@ export interface Simon42StrategyConfig {
   agenda_calendar_entities?: string[]; // default: [] → all visible calendars
   show_todos_section?: boolean; // default: false (auto-hides when no todos)
   todos_entities?: string[]; // default: [] → all visible todo.* entities
+  hide_completed_todos?: boolean; // default: false — hide completed items in
+  // the generated native todo-list cards
   show_persons_section?: boolean; // default: false (auto-hides when no persons)
   show_vacuums_section?: boolean; // default: false (auto-hides without vacuum/mower)
   show_maintenance_section?: boolean; // default: false (auto-hides when nothing pending)
@@ -381,12 +404,7 @@ export interface GroupOptions {
  * - `tile`                 — HA core `tile` card bound to the weather entity
  * - `none`                 — omit built-in card; section keeps heading + slot
  */
-export type WeatherPresentation =
-  | 'forecast_daily'
-  | 'forecast_hourly'
-  | 'forecast_twice_daily'
-  | 'tile'
-  | 'none';
+export type WeatherPresentation = 'forecast_daily' | 'forecast_hourly' | 'forecast_twice_daily' | 'tile' | 'none';
 
 // -- Weather Sensors --------------------------------------------------
 
@@ -404,6 +422,13 @@ export interface WeatherSensorConfig {
   unit?: string;
   /** Round the numeric value to N decimals. Omit to show raw state. */
   round?: number;
+  /**
+   * Hide the entry while its live state is numeric zero or `off` — e.g. a
+   * rain-rate sensor that should only show up while it is raining. Omit
+   * (default) to always render the sensor. Evaluated inside the markdown
+   * template at runtime, so it follows state changes without regenerating.
+   */
+  hide_when?: 'zero_or_off';
 }
 
 // -- Custom Views -----------------------------------------------------

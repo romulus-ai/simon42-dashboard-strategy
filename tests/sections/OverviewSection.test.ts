@@ -141,6 +141,37 @@ describe('createOverviewSection', () => {
       hide_unavailable_entities: true,
     });
   });
+
+  it('passes hidden_areas to the lights/covers/climate tiles only with hide_hidden_areas_in_summaries (#428)', () => {
+    const hass = makeHass({});
+    Registry.initialize(hass, {});
+    function tilesFor(config: Record<string, unknown>): Map<unknown, Record<string, unknown>> {
+      const section = createOverviewSection({ someSensorId: 'sensor.dummy', showSearchCard: false, config, hass });
+      const tiles = (section?.cards ?? [])
+        .filter((c) => c.type === 'horizontal-stack')
+        .flatMap((s) => (s.cards ?? []) as Record<string, unknown>[]);
+      return new Map(tiles.map((t) => [t.summary_type, t]));
+    }
+    const base = { areas_display: { hidden: ['abstellkammer'] }, show_climate_summary: true };
+
+    // Default: hidden overview areas keep counting → no key on any tile
+    for (const tile of tilesFor(base).values()) {
+      expect(tile).not.toHaveProperty('hidden_areas');
+    }
+
+    const on = tilesFor({ ...base, hide_hidden_areas_in_summaries: true });
+    expect(on.get('lights')?.hidden_areas).toEqual(['abstellkammer']);
+    expect(on.get('covers')?.hidden_areas).toEqual(['abstellkammer']);
+    expect(on.get('climate')?.hidden_areas).toEqual(['abstellkammer']);
+    // Security follows hide_hidden_areas_in_security, batteries never filter by area
+    expect(on.get('security')).not.toHaveProperty('hidden_areas');
+    expect(on.get('batteries')).not.toHaveProperty('hidden_areas');
+
+    // Option on but nothing hidden → nothing to exclude, key stays away
+    for (const tile of tilesFor({ hide_hidden_areas_in_summaries: true, show_climate_summary: true }).values()) {
+      expect(tile).not.toHaveProperty('hidden_areas');
+    }
+  });
 });
 
 describe('createHouseModeCards (#414)', () => {
@@ -322,5 +353,118 @@ describe('summary tile user visibility (view_visible_users entry points)', () =>
       (c) => c.type === 'heading' && c.heading !== undefined && !('heading_style' in c)
     );
     expect(fullHeading?.visibility).toEqual([{ condition: 'user', users: ['u1', 'u2'] }]);
+  });
+});
+
+describe('maintenance tile hide-when-ok (#426, opt-in)', () => {
+  function overviewOf(config: Record<string, unknown>) {
+    const hass = makeHass({ entities: [{ entity_id: 'sensor.dummy', state: '1' }] });
+    Registry.initialize(hass, config);
+    const section = createOverviewSection({
+      someSensorId: 'sensor.dummy',
+      showSearchCard: false,
+      config,
+      hass,
+    });
+    const cards = section?.cards ?? [];
+    const stacks = cards.filter((c) => c.type === 'horizontal-stack');
+    return {
+      cards,
+      stacks,
+      stackTiles: stacks.flatMap((s) => (s.cards ?? []) as Record<string, unknown>[]),
+      // tiles emitted directly into the section grid (outside any stack row)
+      standalone: cards.filter((c) => c.type === 'custom:simon42-summary-card') as Record<string, unknown>[],
+    };
+  }
+
+  it('leaves the tile untouched by default: no flag, regular stack row', () => {
+    const { stacks, stackTiles, standalone } = overviewOf({ show_maintenance_summary: true });
+    // lights, covers, security, batteries, maintenance → rows [l,c], [s,b], [m]
+    expect(stacks).toHaveLength(3);
+    const maintenance = stackTiles.find((t) => t.summary_type === 'maintenance');
+    expect(maintenance).toBeDefined();
+    expect(maintenance).not.toHaveProperty('hide_when_ok');
+    expect(standalone).toHaveLength(0);
+  });
+
+  it('has no effect without the maintenance tile', () => {
+    const { stackTiles, standalone } = overviewOf({ hide_maintenance_summary_when_ok: true });
+    expect(stackTiles.some((t) => t.summary_type === 'maintenance')).toBe(false);
+    expect(stackTiles.some((t) => 'hide_when_ok' in t)).toBe(false);
+    expect(standalone).toHaveLength(0);
+  });
+
+  it('flags only the maintenance tile and lifts it out of a row it would occupy alone (2 columns)', () => {
+    const { cards, stacks, stackTiles, standalone } = overviewOf({
+      show_maintenance_summary: true,
+      hide_maintenance_summary_when_ok: true,
+    });
+    expect(stacks).toHaveLength(2);
+    expect(stackTiles.map((t) => t.summary_type)).toEqual(['lights', 'covers', 'security', 'batteries']);
+    expect(stackTiles.some((t) => 'hide_when_ok' in t)).toBe(false);
+    expect(standalone).toEqual([
+      expect.objectContaining({
+        type: 'custom:simon42-summary-card',
+        summary_type: 'maintenance',
+        hide_when_ok: true,
+        grid_options: { columns: 'full' },
+      }),
+    ]);
+    // placed directly after the last stack row, like the row it replaces
+    const lastStack = stacks.at(-1);
+    const lastStackIndex = lastStack ? cards.indexOf(lastStack) : -1;
+    expect(lastStackIndex).toBeGreaterThan(-1);
+    expect(cards.at(lastStackIndex + 1)).toMatchObject({ summary_type: 'maintenance' });
+  });
+
+  it('keeps the tile in a shared row when it has a neighbour (2 columns, climate on)', () => {
+    const { stacks, standalone } = overviewOf({
+      show_maintenance_summary: true,
+      show_climate_summary: true,
+      hide_maintenance_summary_when_ok: true,
+    });
+    expect(stacks).toHaveLength(3);
+    const lastRow = (stacks.at(-1)?.cards ?? []) as Record<string, unknown>[];
+    expect(lastRow.map((t) => t.summary_type)).toEqual(['climate', 'maintenance']);
+    expect(lastRow.at(1)).toMatchObject({ hide_when_ok: true });
+    expect(lastRow.at(0)).not.toHaveProperty('hide_when_ok');
+    expect(standalone).toHaveLength(0);
+  });
+
+  it('keeps the tile in the single row of the 4-column layout', () => {
+    const { stacks, stackTiles, standalone } = overviewOf({
+      show_maintenance_summary: true,
+      hide_maintenance_summary_when_ok: true,
+      summaries_columns: 4,
+    });
+    expect(stacks).toHaveLength(1);
+    expect(stackTiles.map((t) => t.summary_type)).toEqual(['lights', 'covers', 'security', 'batteries', 'maintenance']);
+    expect(stackTiles.at(-1)).toMatchObject({ hide_when_ok: true });
+    expect(standalone).toHaveLength(0);
+  });
+
+  it('lifts the tile out when it is the only summary (4 columns)', () => {
+    const { stacks, standalone } = overviewOf({
+      show_light_summary: false,
+      show_covers_summary: false,
+      show_security_summary: false,
+      show_battery_summary: false,
+      show_maintenance_summary: true,
+      hide_maintenance_summary_when_ok: true,
+      summaries_columns: 4,
+    });
+    expect(stacks).toHaveLength(0);
+    expect(standalone).toEqual([
+      expect.objectContaining({ summary_type: 'maintenance', hide_when_ok: true, grid_options: { columns: 'full' } }),
+    ]);
+  });
+
+  it('keeps the user-visibility rule on the lifted tile', () => {
+    const { standalone } = overviewOf({
+      show_maintenance_summary: true,
+      hide_maintenance_summary_when_ok: true,
+      maintenance_visible_users: ['admin'],
+    });
+    expect(standalone.at(0)?.visibility).toEqual([{ condition: 'user', users: ['admin'] }]);
   });
 });

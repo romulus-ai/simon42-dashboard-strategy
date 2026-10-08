@@ -57,6 +57,8 @@ export interface StrategyEditorHost {
   _weatherSensorSearch: string;
   _securityExtraSearch: string;
   _lightFavSearch: string;
+  _maintenanceIgnoredEntitySearch: string;
+  _maintenanceIgnoredDeviceSearch: string;
 
   // -- Caches / drag handles ---------------------------------------------
   _areaEntitiesCache: Map<string, AreaEntitiesCacheEntry>;
@@ -82,7 +84,7 @@ export interface StrategyEditorHost {
     label: string,
     checked: boolean,
     onChange: (checked: boolean) => void,
-    disabled?: boolean,
+    disabled?: boolean
   ): TemplateResult;
 
   // -- Cross-panel config helpers ------------------------------------------
